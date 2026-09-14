@@ -167,7 +167,9 @@ class ApiClient {
         lastName: (first['last_name'] ?? currentUser!.lastName) as String,
         email: (first['email'] ?? currentUser!.email) as String,
         groups: names.isNotEmpty ? names : currentUser!.groups,
-        area: first['area'] as String? ?? currentUser!.area,
+        area: first['area_id'] is Map
+            ? (first['area_id'] as Map)['nombre'] as String? ?? currentUser!.area
+            : first['area'] as String? ?? currentUser!.area,
         areaId: first['area_id'] is Map
             ? (first['area_id'] as Map)['id'] as int?
             : first['area_id'] as int? ?? currentUser!.areaId,

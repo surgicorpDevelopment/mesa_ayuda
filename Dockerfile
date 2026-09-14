@@ -1,4 +1,5 @@
-# Multi-stage: build Flutter Web → serve with nginx on :80 (host maps 8010)
+# Multi-stage lento: Flutter compila DENTRO de Docker.
+# Preferir Dockerfile.nginx + flutter en el host (ver deploy/update-frontend.ps1).
 FROM ghcr.io/cirruslabs/flutter:3.29.2 AS build
 WORKDIR /app
 COPY pubspec.yaml pubspec.lock ./

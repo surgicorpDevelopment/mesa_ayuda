@@ -71,9 +71,11 @@ Build de prueba con subpath:
 flutter build web --release --base-href /app_mesaayuda/
 ```
 
-## 5. Actualizar versión (flujo normal)
+## 5. Actualizar versión (flujo normal — rápido)
 
 Repo: https://github.com/surgicorpDevelopment/mesa_ayuda
+
+**Requisito en el servidor:** Flutter SDK (ver `deploy/install-flutter-server.ps1`).
 
 **En tu PC (después de cambios):**
 ```powershell
@@ -88,17 +90,24 @@ cd "C:\Users\srvcaminitos\Documents\Gestor de Proyecto - Tickets"
 .\deploy\update-frontend.ps1
 ```
 
-Eso hace `git pull` + rebuild de la imagen + recrea el contenedor en `:8010`.
-IIS no se toca.
+Eso hace: `git pull` → `flutter build web` (host) → imagen **nginx** (`Dockerfile.nginx`) → recrea `:8010`.  
+IIS no se toca. Suele tardar minutos, no horas.
 
-Manual (equivalente):
+### Instalar Flutter en el servidor (una sola vez)
+
+PowerShell **como Administrador**:
 ```powershell
-git pull
-docker build -t surgicorp/app_mesaayuda:latest .
-docker stop app_mesaayuda
-docker rm app_mesaayuda
-docker run -d --name app_mesaayuda --restart unless-stopped -p 8010:80 surgicorp/app_mesaayuda:latest
+cd "C:\Users\srvcaminitos\Documents\Gestor de Proyecto - Tickets"
+.\deploy\install-flutter-server.ps1
 ```
+Instala en `D:\tools\flutter` (fuera de IIS). Cierra y abre PowerShell, luego `flutter doctor`.
+
+### Fallback lento (compilar dentro de Docker)
+
+```powershell
+docker build -f Dockerfile -t surgicorp/app_mesaayuda:latest .
+```
+Solo si no hay Flutter en el host; puede tardar mucho.
 
 ## 6. Rollback
 

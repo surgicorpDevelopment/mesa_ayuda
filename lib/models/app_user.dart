@@ -81,8 +81,9 @@ class AppUser {
       lastName: (json['last_name'] ?? '') as String,
       email: (json['email'] ?? '') as String,
       groups: groups,
-      area: json['area'] as String? ??
-          (areaIdRaw is Map ? areaIdRaw['nombre'] as String? : null),
+      // Preferir area_id.nombre: el campo plano `area` puede ser un valor legado distinto.
+      area: (areaIdRaw is Map ? areaIdRaw['nombre'] as String? : null) ??
+          json['area'] as String?,
       areaId: areaId,
       puesto: json['puesto'] as String? ??
           (json['puesto_id'] is Map

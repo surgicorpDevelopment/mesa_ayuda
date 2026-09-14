@@ -1,7 +1,7 @@
 .git
 .idea
 .dart_tool
-build
+# build/ se genera en el host y Dockerfile.nginx lo necesita en el contexto
 .flutter-plugins
 .flutter-plugins-dependencies
 **/doc/api/
