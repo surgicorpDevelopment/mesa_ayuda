@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Fragmento para agregar a web.config de DjangoNewAPI (sección rewrite/rules).
+  NO reemplaza el web.config completo — solo la regla App_MesaAyuda.
+-->
+<rule name="App_MesaAyuda" stopProcessing="true">
+  <match url="^app_mesaayuda/(.*)" />
+  <action type="Rewrite" url="http://localhost:8010/{R:1}" />
+</rule>

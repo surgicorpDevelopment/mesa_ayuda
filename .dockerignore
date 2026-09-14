@@ -1,0 +1,14 @@
+.git
+.idea
+.dart_tool
+build
+.flutter-plugins
+.flutter-plugins-dependencies
+**/doc/api/
+backend
+docs
+deploy/*.md
+*.iml
+.vscode
+test
+README.md

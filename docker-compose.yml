@@ -1,0 +1,29 @@
+services:
+  app_mesaayuda:
+    build: .
+    image: surgicorp/app_mesaayuda:latest
+    container_name: app_mesaayuda
+    restart: unless-stopped
+    ports:
+      - "8010:80"
+
+  api:
+    profiles: ["local-api"]
+    build:
+      context: ./backend
+      dockerfile: local/Dockerfile
+    image: surgicorp/gp_api_local:latest
+    container_name: gp_api_local
+    ports:
+      - "8000:8000"
+    environment:
+      DJANGO_SECRET_KEY: local-dev-not-secret
+      DJANGO_DEBUG: "1"
+    volumes:
+      - ./backend/GestionProyectos:/app/GestionProyectos
+      - gp_api_data:/app/data
+      - gp_api_media:/app/media
+
+volumes:
+  gp_api_data:
+  gp_api_media:

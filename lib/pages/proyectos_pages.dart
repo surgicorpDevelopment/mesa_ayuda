@@ -1,0 +1,681 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+
+import '../models/models.dart';
+import '../providers/auth_provider.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_theme.dart';
+import '../theme/app_typography.dart';
+import '../widgets/common_widgets.dart';
+import '../widgets/ui/ui.dart';
+
+class ProyectosListPage extends StatefulWidget {
+  const ProyectosListPage({super.key});
+
+  @override
+  State<ProyectosListPage> createState() => _ProyectosListPageState();
+}
+
+class _ProyectosListPageState extends State<ProyectosListPage> {
+  List<Proyecto> _items = [];
+  Map<int, List<Tarea>> _tareasByProject = {};
+  bool _loading = true;
+  String? _error;
+  String? _estadoFilter;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final api = context.read<AuthProvider>().api;
+      final filters = <String, String>{};
+      if (_estadoFilter != null) filters['estado'] = _estadoFilter!;
+      final items = await api.fetchProyectos(filters: filters);
+      final allTareas = await api.fetchTareas();
+      final map = <int, List<Tarea>>{};
+      for (final t in allTareas) {
+        map.putIfAbsent(t.proyectoId, () => []).add(t);
+      }
+      if (mounted) {
+        setState(() {
+          _items = items;
+          _tareasByProject = map;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  double _progress(int projectId) {
+    final list = _tareasByProject[projectId] ?? [];
+    if (list.isEmpty) return 0;
+    final done = list.where((t) => t.estado == 'hecho').length;
+    return done / list.length;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final canCreate = context.watch<AuthProvider>().user?.canManageProyectos == true;
+    final estados = [null, 'idea', 'planificado', 'en_proceso', 'pausado', 'completado', 'cancelado'];
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      floatingActionButton: canCreate
+          ? FloatingActionButton.extended(
+              onPressed: () => context.go('/proyectos/nuevo'),
+              icon: const Icon(Icons.add),
+              label: const Text('Proyecto'),
+            )
+          : null,
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SectionHeader(title: 'Proyectos', subtitle: '${_items.length} proyectos'),
+                const SizedBox(height: 12),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (final e in estados)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: FilterChip(
+                            label: Text(e == null ? 'Todos' : labelEstado(e)),
+                            selected: _estadoFilter == e,
+                            onSelected: (_) {
+                              setState(() => _estadoFilter = e);
+                              _load();
+                            },
+                            selectedColor: AppColors.brand50,
+                            checkmarkColor: AppColors.brand600,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _load,
+              child: _loading
+                  ? const AppSkeletonList(count: 3)
+                  : _error != null
+                      ? ListView(children: [AppEmptyState(message: _error!, icon: Icons.error_outline)])
+                      : _items.isEmpty
+                          ? ListView(children: const [AppEmptyState(message: 'No hay proyectos')])
+                          : GridView.builder(
+                              padding: const EdgeInsets.fromLTRB(24, 8, 24, 88),
+                              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                                maxCrossAxisExtent: 380,
+                                mainAxisExtent: 210,
+                                crossAxisSpacing: 12,
+                                mainAxisSpacing: 12,
+                              ),
+                              itemCount: _items.length,
+                              itemBuilder: (context, i) {
+                                final p = _items[i];
+                                final progress = _progress(p.id);
+                                final tareaCount = (_tareasByProject[p.id] ?? []).length;
+                                return AppCard(
+                                  hoverable: true,
+                                  onTap: () => context.go('/proyectos/${p.id}'),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              p.titulo,
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: AppTypography.textTheme.titleMedium,
+                                            ),
+                                          ),
+                                          StatusBadge.estado(p.estado),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Expanded(
+                                        child: Text(
+                                          p.descripcion.isEmpty ? 'Sin descripción' : p.descripcion,
+                                          maxLines: 3,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: AppTypography.textTheme.bodySmall,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        children: [
+                                          AppAvatar(name: p.responsableNombre ?? '—', size: 26),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              p.responsableNombre ?? 'Sin responsable',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: AppTypography.textTheme.bodySmall,
+                                            ),
+                                          ),
+                                          Text('$tareaCount tareas', style: AppTypography.textTheme.bodySmall),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 10),
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(6),
+                                        child: LinearProgressIndicator(
+                                          value: progress,
+                                          minHeight: 6,
+                                          backgroundColor: AppColors.slate100,
+                                          color: AppColors.brand600,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        '${(progress * 100).round()}% completado',
+                                        style: AppTypography.textTheme.labelSmall,
+                                      ),
+                                    ],
+                                  ),
+                                ).animate().fadeIn(delay: (30 * i).ms);
+                              },
+                            ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class ProyectoFormPage extends StatefulWidget {
+  const ProyectoFormPage({super.key});
+
+  @override
+  State<ProyectoFormPage> createState() => _ProyectoFormPageState();
+}
+
+class _ProyectoFormPageState extends State<ProyectoFormPage> {
+  final _titulo = TextEditingController();
+  final _desc = TextEditingController();
+  String _prioridad = 'media';
+  String _estado = 'idea';
+  int? _areaId;
+  List<AreaOption> _areas = [];
+  bool _loadingAreas = false;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final user = context.read<AuthProvider>().user;
+    _areaId = user?.areaId;
+    if (user?.isLider == true) _loadAreas();
+  }
+
+  Future<void> _loadAreas() async {
+    setState(() => _loadingAreas = true);
+    try {
+      final list = await context.read<AuthProvider>().api.fetchAreas();
+      if (mounted) setState(() { _areas = list; _loadingAreas = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loadingAreas = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _titulo.dispose();
+    _desc.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_titulo.text.trim().isEmpty) return;
+    setState(() => _saving = true);
+    try {
+      final auth = context.read<AuthProvider>();
+      final proyecto = await auth.api.createProyecto({
+        'titulo': _titulo.text.trim(),
+        'descripcion': _desc.text.trim(),
+        'prioridad': _prioridad,
+        'estado': _estado,
+        'area_id': _areaId ?? auth.user?.areaId,
+        'responsable': auth.user?.id,
+      });
+      if (!mounted) return;
+      context.go('/proyectos/${proyecto.id}');
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isLider = context.watch<AuthProvider>().user?.isLider == true;
+
+    return Scaffold(
+      backgroundColor: AppColors.bg,
+      appBar: AppBar(
+        title: const Text('Nuevo proyecto'),
+        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.go('/proyectos')),
+      ),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: ListView(
+            padding: const EdgeInsets.all(24),
+            children: [
+              AppCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    AppTextField(controller: _titulo, label: 'Título'),
+                    const SizedBox(height: 14),
+                    AppTextField(controller: _desc, label: 'Descripción', minLines: 4, maxLines: 8),
+                    // Selector de área solo para gestores/líderes
+                    if (isLider) ...[
+                      const SizedBox(height: 14),
+                      if (_loadingAreas)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          child: LinearProgressIndicator(minHeight: 2),
+                        )
+                      else
+                        DropdownButtonFormField<int?>(
+                          value: _areaId,
+                          decoration: const InputDecoration(
+                            labelText: 'Área',
+                            prefixIcon: Icon(Icons.business_outlined),
+                          ),
+                          items: [
+                            const DropdownMenuItem<int?>(value: null, child: Text('Sin área')),
+                            for (final a in _areas)
+                              DropdownMenuItem<int?>(value: a.id, child: Text(a.nombre)),
+                          ],
+                          onChanged: (v) => setState(() => _areaId = v),
+                        ),
+                    ],
+                    const SizedBox(height: 14),
+                    DropdownButtonFormField<String>(
+                      value: _estado,
+                      decoration: const InputDecoration(labelText: 'Estado'),
+                      items: const [
+                        DropdownMenuItem(value: 'idea', child: Text('En Idea')),
+                        DropdownMenuItem(value: 'planificado', child: Text('Planificado')),
+                        DropdownMenuItem(value: 'en_proceso', child: Text('En Proceso')),
+                      ],
+                      onChanged: (v) => setState(() => _estado = v ?? 'idea'),
+                    ),
+                    const SizedBox(height: 14),
+                    DropdownButtonFormField<String>(
+                      value: _prioridad,
+                      decoration: const InputDecoration(labelText: 'Prioridad'),
+                      items: const [
+                        DropdownMenuItem(value: 'alta', child: Text('Alta')),
+                        DropdownMenuItem(value: 'media', child: Text('Media')),
+                        DropdownMenuItem(value: 'baja', child: Text('Baja')),
+                      ],
+                      onChanged: (v) => setState(() => _prioridad = v ?? 'media'),
+                    ),
+                    const SizedBox(height: 24),
+                    AppButton(label: 'Crear proyecto', loading: _saving, onPressed: _saving ? null : _save, expanded: true),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class ProyectoDetailPage extends StatefulWidget {
+  const ProyectoDetailPage({super.key, required this.id});
+
+  final int id;
+
+  @override
+  State<ProyectoDetailPage> createState() => _ProyectoDetailPageState();
+}
+
+class _ProyectoDetailPageState extends State<ProyectoDetailPage>
+    with SingleTickerProviderStateMixin {
+  Proyecto? _proyecto;
+  List<Tarea> _tareas = [];
+  List<AssignableUser> _usuarios = [];
+  bool _loading = true;
+  String? _error;
+  bool _savingAdjunto = false;
+
+  late final TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final api = context.read<AuthProvider>().api;
+      final results = await Future.wait([
+        api.fetchProyecto(widget.id),
+        api.fetchTareas(proyectoId: widget.id),
+        api.fetchAssignableUsers(),
+      ]);
+      if (mounted) {
+        setState(() {
+          _proyecto = results[0] as Proyecto;
+          _tareas = results[1] as List<Tarea>;
+          _usuarios = results[2] as List<AssignableUser>;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _setEstado(String estado) async {
+    try {
+      final p = await context.read<AuthProvider>().api.updateProyecto(widget.id, {'estado': estado});
+      if (mounted) setState(() => _proyecto = p);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
+  Future<void> _addAdjuntos(List<TicketAdjunto> nuevos) async {
+    if (_savingAdjunto) return;
+    setState(() => _savingAdjunto = true);
+    try {
+      final api = context.read<AuthProvider>().api;
+      Proyecto updated = _proyecto!;
+      for (final adj in nuevos) {
+        updated = await api.addProyectoAdjunto(widget.id, adj);
+      }
+      if (mounted) setState(() => _proyecto = updated);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    } finally {
+      if (mounted) setState(() => _savingAdjunto = false);
+    }
+  }
+
+  Future<void> _removeAdjunto(TicketAdjunto adj) async {
+    if (_savingAdjunto) return;
+    setState(() => _savingAdjunto = true);
+    try {
+      final updated = await context.read<AuthProvider>().api.removeProyectoAdjunto(widget.id, adj.id);
+      if (mounted) setState(() => _proyecto = updated);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    } finally {
+      if (mounted) setState(() => _savingAdjunto = false);
+    }
+  }
+
+  // ── Kanban: mover tarea de columna ─────────────────────────────────────
+
+  Future<void> _moveTarea(Tarea tarea, String nuevoEstado) async {
+    // Optimistic update
+    setState(() {
+      final i = _tareas.indexWhere((t) => t.id == tarea.id);
+      if (i >= 0) {
+        _tareas[i] = Tarea(
+          id: tarea.id,
+          titulo: tarea.titulo,
+          descripcion: tarea.descripcion,
+          estado: nuevoEstado,
+          asignadoAId: tarea.asignadoAId,
+          asignadoANombre: tarea.asignadoANombre,
+          proyectoId: tarea.proyectoId,
+          fechaCreacion: tarea.fechaCreacion,
+          fechaActualizacion: DateTime.now(),
+        );
+      }
+    });
+    try {
+      final updated = await context.read<AuthProvider>().api.updateTarea(tarea.id, {'estado': nuevoEstado});
+      if (mounted) {
+        setState(() {
+          final i = _tareas.indexWhere((t) => t.id == updated.id);
+          if (i >= 0) _tareas[i] = updated;
+        });
+      }
+    } catch (e) {
+      // Revert on failure
+      if (mounted) {
+        setState(() {
+          final i = _tareas.indexWhere((t) => t.id == tarea.id);
+          if (i >= 0) _tareas[i] = tarea;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      }
+    }
+  }
+
+  // ── Kanban: crear tarea ─────────────────────────────────────────────────
+
+  Future<void> _createTarea(String titulo, String estado, int? asignadoAId) async {
+    try {
+      final tarea = await context.read<AuthProvider>().api.createTarea({
+        'titulo': titulo,
+        'estado': estado,
+        'proyecto': widget.id,
+        if (asignadoAId != null) 'asignado_a': asignadoAId,
+      });
+      if (mounted) setState(() => _tareas.add(tarea));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
+  // ── Kanban: eliminar tarea ─────────────────────────────────────────────
+
+  Future<void> _deleteTarea(Tarea tarea) async {
+    setState(() => _tareas.removeWhere((t) => t.id == tarea.id));
+    try {
+      await context.read<AuthProvider>().api.deleteTarea(tarea.id);
+    } catch (e) {
+      // Restore on failure
+      if (mounted) {
+        setState(() => _tareas.add(tarea));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      }
+    }
+  }
+
+  // ── Kanban: cambiar responsable ────────────────────────────────────────
+
+  Future<void> _assignTarea(Tarea tarea, int? asignadoAId) async {
+    try {
+      final updated = await context.read<AuthProvider>().api.updateTarea(tarea.id, {
+        'asignado_a': asignadoAId,
+      });
+      if (mounted) {
+        setState(() {
+          final i = _tareas.indexWhere((t) => t.id == updated.id);
+          if (i >= 0) _tareas[i] = updated;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
+  // ── Build ───────────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    final canManage = context.watch<AuthProvider>().user?.canManageProyectos == true;
+
+    return Scaffold(
+      backgroundColor: AppColors.bg,
+      appBar: AppBar(
+        title: Text(_proyecto?.titulo ?? 'Proyecto #${widget.id}'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.go('/proyectos'),
+        ),
+        bottom: _loading || _error != null
+            ? null
+            : TabBar(
+                controller: _tabController,
+                labelColor: AppColors.white,
+                unselectedLabelColor: AppColors.slate300,
+                indicatorColor: AppColors.white,
+                tabs: [
+                  const Tab(text: 'Detalle'),
+                  Tab(text: 'Tareas (${_tareas.length})'),
+                ],
+              ),
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+          : _error != null
+              ? AppEmptyState(message: _error!, icon: Icons.error_outline)
+              : TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildDetalleTab(canManage),
+                    _buildTareasTab(),
+                  ],
+                ),
+    );
+  }
+
+  Widget _buildDetalleTab(bool canManage) {
+    final p = _proyecto!;
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: 8,
+                children: [
+                  StatusBadge.estado(p.estado),
+                  PriorityIndicator(prioridad: p.prioridad),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Text(
+                p.descripcion.isEmpty ? 'Sin descripción' : p.descripcion,
+                style: AppTypography.textTheme.bodyLarge,
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  AppAvatar(name: p.responsableNombre ?? '—', size: 30),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Responsable: ${p.responsableNombre ?? "—"}',
+                    style: AppTypography.textTheme.bodySmall,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              AttachmentGallery(
+                adjuntos: p.adjuntos,
+                onAdd: _addAdjuntos,
+                onRemove: _removeAdjunto,
+                saving: _savingAdjunto,
+              ),
+              if (canManage) ...[
+                const SizedBox(height: 16),
+                Text('Estado', style: AppTypography.textTheme.labelMedium),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final e in ['idea', 'planificado', 'en_proceso', 'pausado', 'completado', 'cancelado'])
+                      ColorChip(
+                        label: labelEstado(e),
+                        selected: p.estado == e,
+                        color: estadoColor(e),
+                        softColor: estadoSoft(e),
+                        onTap: () => _setEstado(e),
+                      ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        AppCard(
+          child: ComentariosPanel(
+            tipo: 'proyecto',
+            refId: widget.id,
+            load: () => context.read<AuthProvider>().api.fetchComentarios('proyecto', widget.id),
+            onSubmit: (c) => context.read<AuthProvider>().api.createComentario('proyecto', widget.id, c),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTareasTab() {
+    final puedeBorrar = context.read<AuthProvider>().user?.isLider == true;
+    return KanbanBoard(
+      tareas: _tareas,
+      usuarios: _usuarios,
+      onMove: _moveTarea,
+      onCreate: _createTarea,
+      onDelete: puedeBorrar ? _deleteTarea : null,
+      onAssign: _assignTarea,
+    );
+  }
+}
