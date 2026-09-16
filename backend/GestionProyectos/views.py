@@ -1,4 +1,5 @@
 import os
+import re
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -508,26 +509,69 @@ def _catalogo_nombre(model_names, pk):
         pk = int(pk)
     except (TypeError, ValueError):
         return None
-    names = set(model_names)
+    names = {n.lower() for n in model_names}
     for model in apps.get_models():
-        if model.__name__ not in names and getattr(model._meta, 'db_table', '') not in names:
+        label = model.__name__.lower()
+        table = getattr(model._meta, 'db_table', '').lower()
+        if not any(n in label or n in table for n in names):
             continue
-        nombre = model.objects.filter(pk=pk).values_list('nombre', flat=True).first()
-        if nombre:
-            return str(nombre).strip() or None
+        for field in ('nombre', 'name', 'descripcion', 'titulo'):
+            if not any(f.name == field for f in model._meta.fields):
+                continue
+            valor = model.objects.filter(pk=pk).values_list(field, flat=True).first()
+            if valor and str(valor).strip():
+                return str(valor).strip()
+    return None
+
+
+def _pk_relacionado(valor):
+    if valor is None or isinstance(valor, bool):
+        return None
+    if isinstance(valor, int):
+        return valor
+    if isinstance(valor, float):
+        return int(valor)
+    if isinstance(valor, dict):
+        if valor.get('id') is not None:
+            try:
+                return int(valor['id'])
+            except (TypeError, ValueError):
+                pass
+        url = valor.get('url') or ''
+        m = re.search(r'/(\d+)/?$', str(url))
+        return int(m.group(1)) if m else None
+    if hasattr(valor, 'pk') and valor.pk is not None:
+        try:
+            return int(valor.pk)
+        except (TypeError, ValueError):
+            return None
     return None
 
 
 def _campo_usuario(user, *attrs, catalogos=()):
     """Primer valor legible entre attrs de ExtendedUsers (texto, FK o id de catálogo)."""
-    for attr in attrs:
-        valor = getattr(user, attr, None)
+    candidates = list(attrs)
+    stem = attrs[0] if attrs else ''
+    try:
+        for f in user._meta.get_fields():
+            name = getattr(f, 'name', '') or ''
+            if stem and stem in name and name not in candidates:
+                candidates.append(name)
+    except Exception:
+        pass
+
+    for attr in candidates:
+        if not hasattr(user, attr):
+            continue
+        try:
+            valor = getattr(user, attr)
+        except Exception:
+            continue
         texto = _texto_relacionado(valor)
         if texto:
             return texto
         if catalogos and valor is not None:
-            pk = valor.pk if hasattr(valor, 'pk') else valor
-            texto = _catalogo_nombre(catalogos, pk)
+            texto = _catalogo_nombre(catalogos, _pk_relacionado(valor))
             if texto:
                 return texto
     return None
@@ -570,6 +614,10 @@ class GP_UsuarioViewSet(viewsets.ViewSet):
     def me(self, request):
         user = request.user
         group_names = list(user.groups.values_list('name', flat=True))
+        area = _campo_usuario(user, 'area', 'area_id', catalogos=('EU_Area', 'Area'))
+        puesto = _campo_usuario(
+            user, 'puesto', 'puesto_id', catalogos=('EU_Puesto', 'Puesto')
+        )
         return Response(
             {
                 'id': user.id,
@@ -581,11 +629,10 @@ class GP_UsuarioViewSet(viewsets.ViewSet):
                 'groups': group_names,
                 # En prod ExtendedUsers trae area (texto) + area_id (FK);
                 # puesto suele venir solo como puesto_id (FK a EU_Puesto).
-                'area': _campo_usuario(user, 'area', 'area_id', catalogos=('EU_Area',)),
+                'area': area,
                 'area_id': get_user_area_id(user),
-                'puesto': _campo_usuario(
-                    user, 'puesto', 'puesto_id', catalogos=('EU_Puesto',)
-                ),
+                'puesto': puesto,
+                'puesto_id': {'nombre': puesto} if puesto else None,
                 'rol': _rol_display(user, set(group_names)),
                 'is_staff': bool(user.is_staff),
                 # Calculados con los mismos helpers que autorizan las peticiones,

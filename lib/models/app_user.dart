@@ -41,8 +41,7 @@ class AppUser {
   bool get isGestor =>
       esGestor ?? (isStaff || groups.contains('gp_gestor_proyectos'));
 
-  bool get isLider =>
-      esLider ?? (isGestor || groups.contains('gp_lider_area'));
+  bool get isLider => esLider ?? (isGestor || groups.contains('gp_lider_area'));
 
   bool get isDesarrollador =>
       esDesarrollador ?? (isLider || groups.contains('gp_desarrollador'));
@@ -74,6 +73,16 @@ class AppUser {
       areaId = areaIdRaw;
     }
 
+    String? nonEmpty(dynamic value) {
+      if (value is! String) return null;
+      final t = value.trim();
+      return t.isEmpty ? null : t;
+    }
+
+    final puestoIdRaw = json['puesto_id'];
+    final puestoFromId =
+        puestoIdRaw is Map ? nonEmpty(puestoIdRaw['nombre']) : null;
+
     return AppUser(
       id: json['id'] as int,
       username: (json['username'] ?? '') as String,
@@ -82,13 +91,11 @@ class AppUser {
       email: (json['email'] ?? '') as String,
       groups: groups,
       // Preferir area_id.nombre: el campo plano `area` puede ser un valor legado distinto.
-      area: (areaIdRaw is Map ? areaIdRaw['nombre'] as String? : null) ??
-          json['area'] as String?,
+      area: (areaIdRaw is Map ? nonEmpty(areaIdRaw['nombre']) : null) ??
+          nonEmpty(json['area']),
       areaId: areaId,
-      puesto: json['puesto'] as String? ??
-          (json['puesto_id'] is Map
-              ? (json['puesto_id'] as Map)['nombre'] as String?
-              : null),
+      // En prod el cargo está en puesto_id.nombre (/users/), no en un CharField puesto.
+      puesto: nonEmpty(json['puesto']) ?? puestoFromId,
       isStaff: json['is_staff'] == true,
       esGestor: json['es_gestor'] as bool?,
       esLider: json['es_lider'] as bool?,

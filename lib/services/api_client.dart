@@ -38,8 +38,24 @@ class ApiClient {
     _refresh = prefs.getString('gp_refresh');
     final userJson = prefs.getString('gp_user');
     if (userJson != null) {
-      currentUser = AppUser.fromJson(jsonDecode(userJson) as Map<String, dynamic>);
+      currentUser = AppUser.fromJson(
+        jsonDecode(userJson) as Map<String, dynamic>,
+      );
     }
+    // Rehidratar puesto/área desde API (la sesión cacheada puede no tenerlos).
+    if (_access != null && currentUser != null) {
+      try {
+        await refreshPerfil();
+      } catch (_) {}
+    }
+  }
+
+  /// Perfil GP + complemento de ExtendedUsers (/users/{id}/) para puesto_id.
+  Future<void> refreshPerfil() async {
+    if (_access == null) return;
+    currentUser = AppUser.fromJson(await _get(ApiConfig.perfilPath));
+    await _enrichPuestoFromUsers();
+    await _persist();
   }
 
   Future<void> _persist() async {
@@ -107,7 +123,10 @@ class ApiClient {
     _access = data['access'] as String?;
     _refresh = data['refresh'] as String?;
     if (_access == null) {
-      throw ApiException(res.statusCode, 'Login OK pero el servidor no devolvió access token.');
+      throw ApiException(
+        res.statusCode,
+        'Login OK pero el servidor no devolvió access token.',
+      );
     }
     final userMap = data['user'] as Map<String, dynamic>?;
     currentUser = userMap != null
@@ -116,6 +135,8 @@ class ApiClient {
     // El rol lo decide el backend: /api/token/ no incluye los grupos.
     try {
       currentUser = AppUser.fromJson(await _get(ApiConfig.perfilPath));
+      // me/ a veces no resuelve puesto; /users/{id}/ sí trae puesto_id.nombre.
+      await _enrichPuestoFromUsers();
     } on ApiException {
       // En mock, GP_* puede no estar desplegado todavía: caer al scraping de /users/.
       if (!ApiConfig.useMock) rethrow;
@@ -123,6 +144,43 @@ class ApiClient {
     }
     await _persist();
     return currentUser!;
+  }
+
+  /// Completa puesto desde ExtendedUsers en /users/{id}/ (fuente real en prod).
+  Future<void> _enrichPuestoFromUsers() async {
+    if (currentUser == null || _access == null) return;
+    final already = currentUser!.puesto?.trim();
+    if (already != null && already.isNotEmpty) return;
+    try {
+      final first = await _get('${ApiConfig.usersPath}${currentUser!.id}/');
+      final puestoId = first['puesto_id'];
+      final puesto = puestoId is Map
+          ? (puestoId['nombre'] as String?)?.trim()
+          : null;
+      if (puesto == null || puesto.isEmpty) return;
+
+      final areaId = first['area_id'];
+      final areaFromId = areaId is Map ? areaId['nombre'] as String? : null;
+
+      currentUser = AppUser(
+        id: currentUser!.id,
+        username: currentUser!.username,
+        firstName: currentUser!.firstName,
+        lastName: currentUser!.lastName,
+        email: currentUser!.email,
+        groups: currentUser!.groups,
+        area: currentUser!.area ?? areaFromId ?? first['area'] as String?,
+        areaId: currentUser!.areaId ??
+            (areaId is Map ? areaId['id'] as int? : areaId as int?),
+        puesto: puesto,
+        isStaff: currentUser!.isStaff,
+        esGestor: currentUser!.esGestor,
+        esLider: currentUser!.esLider,
+        esDesarrollador: currentUser!.esDesarrollador,
+      );
+    } catch (_) {
+      // Sin puesto: la UI muestra "—".
+    }
   }
 
   /// Fallback solo para modo mock, mientras `GP_Usuario` no exista en el servidor.
@@ -169,7 +227,8 @@ class ApiClient {
         email: (first['email'] ?? currentUser!.email) as String,
         groups: names.isNotEmpty ? names : currentUser!.groups,
         area: first['area_id'] is Map
-            ? (first['area_id'] as Map)['nombre'] as String? ?? currentUser!.area
+            ? (first['area_id'] as Map)['nombre'] as String? ??
+                  currentUser!.area
             : first['area'] as String? ?? currentUser!.area,
         areaId: first['area_id'] is Map
             ? (first['area_id'] as Map)['id'] as int?
@@ -210,9 +269,7 @@ class ApiClient {
   }
 
   Map<String, String> _authHeaders({bool json = true}) {
-    final h = <String, String>{
-      'Accept': 'application/json',
-    };
+    final h = <String, String>{'Accept': 'application/json'};
     if (json) h['Content-Type'] = 'application/json';
     if (_access != null) h['Authorization'] = 'Bearer $_access';
     return h;
@@ -232,7 +289,10 @@ class ApiClient {
     try {
       final decoded = jsonDecode(body);
       if (decoded is Map<String, dynamic>) return decoded;
-      throw ApiException(res.statusCode, 'JSON inesperado: ${decoded.runtimeType}');
+      throw ApiException(
+        res.statusCode,
+        'JSON inesperado: ${decoded.runtimeType}',
+      );
     } on FormatException catch (e) {
       throw ApiException(res.statusCode, 'JSON inválido: ${e.message}');
     }
@@ -259,9 +319,7 @@ class ApiClient {
     return body.length > 180 ? '${body.substring(0, 180)}…' : body;
   }
 
-  Future<http.Response> _send(
-    Future<http.Response> Function() call,
-  ) async {
+  Future<http.Response> _send(Future<http.Response> Function() call) async {
     var res = await call();
     if (res.statusCode == 401) {
       final ok = await tryRefresh();
@@ -283,14 +341,20 @@ class ApiClient {
     if (res.body.isEmpty) return {};
     final body = res.body.trim();
     if (body.startsWith('<!') || body.startsWith('<html')) {
-      throw ApiException(res.statusCode, 'El servidor devolvió HTML en vez de JSON.');
+      throw ApiException(
+        res.statusCode,
+        'El servidor devolvió HTML en vez de JSON.',
+      );
     }
     final decoded = jsonDecode(body);
     if (decoded is List) return {'results': decoded};
     return decoded as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> _post(String path, Map<String, dynamic> body) async {
+  Future<Map<String, dynamic>> _post(
+    String path,
+    Map<String, dynamic> body,
+  ) async {
     final res = await _send(
       () => http.post(
         _uri(path),
@@ -304,7 +368,10 @@ class ApiClient {
     return _decodeJsonMap(res);
   }
 
-  Future<Map<String, dynamic>> _patch(String path, Map<String, dynamic> body) async {
+  Future<Map<String, dynamic>> _patch(
+    String path,
+    Map<String, dynamic> body,
+  ) async {
     final res = await _send(
       () => http.patch(
         _uri(path),
@@ -357,10 +424,10 @@ class ApiClient {
         isDesarrollador: u?.isDesarrollador ?? false,
       );
     }
-    final data = await _get(ApiConfig.ticketsPath, query: {
-      'format': 'json',
-      ...?filters,
-    });
+    final data = await _get(
+      ApiConfig.ticketsPath,
+      query: {'format': 'json', ...?filters},
+    );
     return _results(data).map(Ticket.fromJson).toList();
   }
 
@@ -458,7 +525,8 @@ class ApiClient {
         headers: _authHeaders(json: false),
       ),
     );
-    if (res.statusCode >= 400) throw ApiException(res.statusCode, _errorMessage(res));
+    if (res.statusCode >= 400)
+      throw ApiException(res.statusCode, _errorMessage(res));
   }
 
   /// Sube un adjunto al ticket. Devuelve el ticket actualizado.
@@ -479,16 +547,21 @@ class ApiClient {
       final comma = adjunto.url.indexOf(',');
       if (comma > 0) {
         final bytes = base64Decode(adjunto.url.substring(comma + 1));
-        request.files.add(http.MultipartFile.fromBytes(
-          'archivo',
-          bytes,
-          filename: adjunto.nombre,
-          contentType: _mediaTypeFor(adjunto),
-        ));
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'archivo',
+            bytes,
+            filename: adjunto.nombre,
+            contentType: _mediaTypeFor(adjunto),
+          ),
+        );
       }
     }
-    final streamed = await _send(() async => http.Response.fromStream(await request.send()));
-    if (streamed.statusCode >= 400) throw ApiException(streamed.statusCode, _errorMessage(streamed));
+    final streamed = await _send(
+      () async => http.Response.fromStream(await request.send()),
+    );
+    if (streamed.statusCode >= 400)
+      throw ApiException(streamed.statusCode, _errorMessage(streamed));
     // Recargar el ticket completo para tener la lista de adjuntos actualizada
     final data = await _get('${ApiConfig.ticketsPath}$ticketId/');
     return Ticket.fromJson(data);
@@ -509,7 +582,8 @@ class ApiClient {
         headers: _authHeaders(json: false),
       ),
     );
-    if (res.statusCode >= 400) throw ApiException(res.statusCode, _errorMessage(res));
+    if (res.statusCode >= 400)
+      throw ApiException(res.statusCode, _errorMessage(res));
     final data = await _get('${ApiConfig.ticketsPath}$ticketId/');
     return Ticket.fromJson(data);
   }
@@ -567,15 +641,18 @@ class ApiClient {
       return list;
     }
     final q = query?.trim();
-    final data = await _get(ApiConfig.usuariosPath, query: {
-      'format': 'json',
-      if (q != null && q.isNotEmpty) 'q': q,
-    });
+    final data = await _get(
+      ApiConfig.usuariosPath,
+      query: {'format': 'json', if (q != null && q.isNotEmpty) 'q': q},
+    );
     return _results(data).map(AssignableUser.fromJson).toList();
   }
 
   /// Sube un adjunto a un proyecto. Devuelve el proyecto actualizado.
-  Future<Proyecto> addProyectoAdjunto(int proyectoId, TicketAdjunto adjunto) async {
+  Future<Proyecto> addProyectoAdjunto(
+    int proyectoId,
+    TicketAdjunto adjunto,
+  ) async {
     if (ApiConfig.useMock) {
       await Future<void>.delayed(const Duration(milliseconds: 200));
       final cur = _mock.getProyecto(proyectoId);
@@ -590,22 +667,30 @@ class ApiClient {
       final comma = adjunto.url.indexOf(',');
       if (comma > 0) {
         final bytes = base64Decode(adjunto.url.substring(comma + 1));
-        request.files.add(http.MultipartFile.fromBytes(
-          'archivo',
-          bytes,
-          filename: adjunto.nombre,
-          contentType: _mediaTypeFor(adjunto),
-        ));
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'archivo',
+            bytes,
+            filename: adjunto.nombre,
+            contentType: _mediaTypeFor(adjunto),
+          ),
+        );
       }
     }
-    final streamed = await _send(() async => http.Response.fromStream(await request.send()));
-    if (streamed.statusCode >= 400) throw ApiException(streamed.statusCode, _errorMessage(streamed));
+    final streamed = await _send(
+      () async => http.Response.fromStream(await request.send()),
+    );
+    if (streamed.statusCode >= 400)
+      throw ApiException(streamed.statusCode, _errorMessage(streamed));
     final data = await _get('${ApiConfig.proyectosPath}$proyectoId/');
     return Proyecto.fromJson(data);
   }
 
   /// Elimina un adjunto de un proyecto. Devuelve el proyecto actualizado.
-  Future<Proyecto> removeProyectoAdjunto(int proyectoId, String adjuntoId) async {
+  Future<Proyecto> removeProyectoAdjunto(
+    int proyectoId,
+    String adjuntoId,
+  ) async {
     if (ApiConfig.useMock) {
       await Future<void>.delayed(const Duration(milliseconds: 150));
       final cur = _mock.getProyecto(proyectoId);
@@ -619,7 +704,8 @@ class ApiClient {
         headers: _authHeaders(json: false),
       ),
     );
-    if (res.statusCode >= 400) throw ApiException(res.statusCode, _errorMessage(res));
+    if (res.statusCode >= 400)
+      throw ApiException(res.statusCode, _errorMessage(res));
     final data = await _get('${ApiConfig.proyectosPath}$proyectoId/');
     return Proyecto.fromJson(data);
   }
@@ -637,10 +723,10 @@ class ApiClient {
         isDesarrollador: u?.isDesarrollador ?? false,
       );
     }
-    final data = await _get(ApiConfig.proyectosPath, query: {
-      'format': 'json',
-      ...?filters,
-    });
+    final data = await _get(
+      ApiConfig.proyectosPath,
+      query: {'format': 'json', ...?filters},
+    );
     return _results(data).map(Proyecto.fromJson).toList();
   }
 
@@ -701,7 +787,8 @@ class ApiClient {
         headers: _authHeaders(json: false),
       ),
     );
-    if (res.statusCode >= 400) throw ApiException(res.statusCode, _errorMessage(res));
+    if (res.statusCode >= 400)
+      throw ApiException(res.statusCode, _errorMessage(res));
   }
 
   Future<List<Comentario>> fetchComentarios(String tipo, int refId) async {
@@ -709,15 +796,18 @@ class ApiClient {
       await Future<void>.delayed(const Duration(milliseconds: 120));
       return _mock.listComentarios(tipo, refId);
     }
-    final data = await _get(ApiConfig.comentariosPath, query: {
-      'tipo': tipo,
-      'ref_id': '$refId',
-      'format': 'json',
-    });
+    final data = await _get(
+      ApiConfig.comentariosPath,
+      query: {'tipo': tipo, 'ref_id': '$refId', 'format': 'json'},
+    );
     return _results(data).map(Comentario.fromJson).toList();
   }
 
-  Future<Comentario> createComentario(String tipo, int refId, String cuerpo) async {
+  Future<Comentario> createComentario(
+    String tipo,
+    int refId,
+    String cuerpo,
+  ) async {
     if (ApiConfig.useMock) {
       await Future<void>.delayed(const Duration(milliseconds: 150));
       return _mock.createComentario(
@@ -741,11 +831,10 @@ class ApiClient {
       await Future<void>.delayed(const Duration(milliseconds: 120));
       return _mock.listHistorial(tipo, refId);
     }
-    final data = await _get(ApiConfig.historialPath, query: {
-      'tipo': tipo,
-      'ref_id': '$refId',
-      'format': 'json',
-    });
+    final data = await _get(
+      ApiConfig.historialPath,
+      query: {'tipo': tipo, 'ref_id': '$refId', 'format': 'json'},
+    );
     final items = _results(data).map(HistorialEstado.fromJson).toList()
       ..sort((a, b) => a.fecha.compareTo(b.fecha));
     return items;
@@ -768,7 +857,9 @@ class ApiClient {
     if (ApiConfig.useMock) {
       await Future<void>.delayed(const Duration(milliseconds: 200));
       final asignadoId = body['asignado_a'] as int?;
-      final asignadoNombre = asignadoId != null ? _mock.nameForUser(asignadoId) : null;
+      final asignadoNombre = asignadoId != null
+          ? _mock.nameForUser(asignadoId)
+          : null;
       return _mock.createTarea(
         body,
         asignadoNombre: asignadoNombre,
@@ -816,7 +907,8 @@ class ApiClient {
         headers: _authHeaders(json: false),
       ),
     );
-    if (res.statusCode >= 400) throw ApiException(res.statusCode, _errorMessage(res));
+    if (res.statusCode >= 400)
+      throw ApiException(res.statusCode, _errorMessage(res));
   }
 
   Future<ProductividadReport> fetchProductividad({
@@ -829,11 +921,10 @@ class ApiClient {
       await Future<void>.delayed(const Duration(milliseconds: 200));
       return _mock.productividad(desde: desde, hasta: hasta);
     }
-    final data = await _get(ApiConfig.productividadPath, query: {
-      'desde': fmt(desde),
-      'hasta': fmt(hasta),
-      'format': 'json',
-    });
+    final data = await _get(
+      ApiConfig.productividadPath,
+      query: {'desde': fmt(desde), 'hasta': fmt(hasta), 'format': 'json'},
+    );
     return ProductividadReport.fromJson(data);
   }
 
@@ -846,14 +937,17 @@ class ApiClient {
     final query = <String, String>{'format': 'json'};
     if (soloActivos) query['activo'] = 'true';
     final data = await _get(ApiConfig.sistemasPath, query: query);
-    return _results(data).map((j) {
-      return SistemaOption(
-        value: (j['codigo'] ?? '') as String,
-        label: (j['nombre'] ?? '') as String,
-        hint: (j['descripcion'] as String?)?.isNotEmpty == true
-            ? j['descripcion'] as String
-            : null,
-      );
-    }).where((o) => o.value.isNotEmpty).toList();
+    return _results(data)
+        .map((j) {
+          return SistemaOption(
+            value: (j['codigo'] ?? '') as String,
+            label: (j['nombre'] ?? '') as String,
+            hint: (j['descripcion'] as String?)?.isNotEmpty == true
+                ? j['descripcion'] as String
+                : null,
+          );
+        })
+        .where((o) => o.value.isNotEmpty)
+        .toList();
   }
 }
