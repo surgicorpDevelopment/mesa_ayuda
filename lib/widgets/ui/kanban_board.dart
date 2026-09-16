@@ -237,7 +237,7 @@ class _KanbanBoardState extends State<KanbanBoard> {
         builder: (ctx2, setStateDialog) => AlertDialog(
           title: const Text('Editar tarea'),
           content: SizedBox(
-            width: 400,
+            width: 440,
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -415,192 +415,263 @@ class _TareaCardContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.white,
+    final descripcion = tarea.descripcion.trim();
+    final asignado = tarea.asignadoANombre?.trim();
+    final esperando = tarea.esperando;
+
+    return Material(
+      color: AppColors.white,
+      elevation: isDragging ? 6 : 0,
+      shadowColor: Colors.black.withValues(alpha: 0.18),
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        onTap: isDragging ? null : onEditTap,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.slate200),
-        boxShadow: isDragging
-            ? [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.12),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                )
-              ]
-            : null,
-      ),
-      padding: const EdgeInsets.fromLTRB(12, 10, 6, 10),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-          Container(
-            width: 3,
-            margin: const EdgeInsets.only(right: 10),
-            decoration: BoxDecoration(
-              color: accentColor,
-              borderRadius: BorderRadius.circular(2),
-            ),
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.slate200),
           ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  tarea.titulo,
-                  style: AppTypography.textTheme.titleSmall?.copyWith(fontSize: 13),
+                Container(
+                  width: 4,
+                  decoration: BoxDecoration(
+                    color: accentColor,
+                    borderRadius: const BorderRadius.horizontal(left: Radius.circular(9)),
+                  ),
                 ),
-                if (tarea.descripcion.trim().isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    tarea.descripcion,
-                    style: AppTypography.textTheme.bodySmall?.copyWith(
-                      color: AppColors.slate500,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 6),
-                if (!isDragging && onEditTap != null)
-                  InkWell(
-                    onTap: onEditTap,
-                    borderRadius: BorderRadius.circular(6),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 2),
-                      child: Row(
-                        children: [
-                          if (tarea.asignadoANombre != null) ...[
-                            AppAvatar(name: tarea.asignadoANombre!, size: 17),
-                            const SizedBox(width: 5),
-                            Expanded(
-                              child: Text(
-                                tarea.asignadoANombre!,
-                                style: AppTypography.textTheme.bodySmall?.copyWith(
-                                  color: AppColors.slate500,
-                                  fontSize: 11,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ] else ...[
-                            Icon(Icons.person_add_alt_1_outlined, size: 14, color: AppColors.brand600),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Editar',
-                              style: AppTypography.textTheme.bodySmall?.copyWith(
-                                color: AppColors.brand600,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                          const SizedBox(width: 2),
-                          const Icon(Icons.edit_outlined, size: 12, color: AppColors.slate300),
-                        ],
-                      ),
-                    ),
-                  )
-                else if (tarea.asignadoANombre != null)
-                  Row(
-                    children: [
-                      AppAvatar(name: tarea.asignadoANombre!, size: 17),
-                      const SizedBox(width: 5),
-                      Expanded(
-                        child: Text(
-                          tarea.asignadoANombre!,
-                          style: AppTypography.textTheme.bodySmall?.copyWith(
-                            color: AppColors.slate500,
-                            fontSize: 11,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                if (tarea.esperando.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
-                    decoration: BoxDecoration(
-                      color: AppColors.warningSoft,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.warning.withValues(alpha: 0.28)),
-                    ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(Icons.hourglass_top_rounded, size: 13, color: AppColors.warning),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Esperando',
-                              style: AppTypography.textTheme.labelSmall?.copyWith(
-                                color: AppColors.warning,
-                                fontWeight: FontWeight.w700,
+                            Expanded(
+                              child: Text(
+                                tarea.titulo,
+                                style: AppTypography.textTheme.titleSmall?.copyWith(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.slate900,
+                                  height: 1.25,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
+                            if (!isDragging && (onEditTap != null || onDelete != null)) ...[
+                              const SizedBox(width: 4),
+                              if (onEditTap != null)
+                                _CardIconButton(
+                                  tooltip: 'Editar',
+                                  icon: Icons.edit_outlined,
+                                  onTap: onEditTap!,
+                                ),
+                              if (onDelete != null)
+                                _CardIconButton(
+                                  tooltip: 'Eliminar',
+                                  icon: Icons.close,
+                                  onTap: onDelete!,
+                                ),
+                            ],
                           ],
                         ),
-                        const SizedBox(height: 4),
-                        Wrap(
-                          spacing: 4,
-                          runSpacing: 4,
+                        if (descripcion.isNotEmpty) ...[
+                          const SizedBox(height: 5),
+                          Text(
+                            descripcion,
+                            style: AppTypography.textTheme.bodySmall?.copyWith(
+                              color: AppColors.slate500,
+                              fontSize: 11.5,
+                              height: 1.35,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                        const SizedBox(height: 10),
+                        Row(
                           children: [
-                            for (final p in tarea.esperando)
-                              Container(
-                                padding: const EdgeInsets.fromLTRB(7, 4, 7, 5),
-                                decoration: BoxDecoration(
-                                  color: AppColors.white,
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: AppColors.warning.withValues(alpha: 0.35)),
+                            if (asignado != null && asignado.isNotEmpty) ...[
+                              AppAvatar(name: asignado, size: 20),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  asignado,
+                                  style: AppTypography.textTheme.bodySmall?.copyWith(
+                                    color: AppColors.slate700,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                              ),
+                            ] else
+                              Expanded(
+                                child: Row(
                                   children: [
+                                    Icon(
+                                      Icons.person_outline,
+                                      size: 15,
+                                      color: AppColors.slate500,
+                                    ),
+                                    const SizedBox(width: 4),
                                     Text(
-                                      p.esExterno ? '${p.nombre} (ext.)' : p.nombre,
-                                      style: AppTypography.textTheme.labelSmall?.copyWith(
-                                        color: AppColors.slate700,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w700,
+                                      'Sin asignar',
+                                      style: AppTypography.textTheme.bodySmall?.copyWith(
+                                        color: AppColors.slate500,
+                                        fontSize: 11.5,
                                       ),
                                     ),
-                                    if (p.detalle.isNotEmpty)
-                                      Text(
-                                        p.detalle,
-                                        style: AppTypography.textTheme.labelSmall?.copyWith(
-                                          color: AppColors.slate500,
-                                          fontSize: 10,
-                                        ),
-                                      ),
                                   ],
                                 ),
                               ),
                           ],
                         ),
+                        if (esperando.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),
+                            decoration: BoxDecoration(
+                              color: AppColors.warningSoft.withValues(alpha: 0.65),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.hourglass_top_rounded,
+                                      size: 13,
+                                      color: AppColors.warning,
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      'Esperando · ${esperando.length}',
+                                      style: AppTypography.textTheme.labelSmall?.copyWith(
+                                        color: AppColors.warning,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                for (var i = 0; i < esperando.length; i++) ...[
+                                  if (i > 0) const SizedBox(height: 5),
+                                  _EsperandoCardRow(persona: esperando[i]),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
-                ],
+                ),
               ],
             ),
           ),
-          if (onDelete != null && !isDragging)
-            GestureDetector(
-              onTap: onDelete,
-              child: const Padding(
-                padding: EdgeInsets.fromLTRB(4, 0, 2, 0),
-                child: Icon(Icons.close, size: 14, color: AppColors.slate300),
-              ),
-            ),
-          ],
         ),
       ),
+    );
+  }
+}
+
+class _CardIconButton extends StatelessWidget {
+  const _CardIconButton({
+    required this.tooltip,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: Icon(icon, size: 15, color: AppColors.slate500),
+        ),
+      ),
+    );
+  }
+}
+
+class _EsperandoCardRow extends StatelessWidget {
+  const _EsperandoCardRow({required this.persona});
+
+  final TareaEspera persona;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 1),
+          child: AppAvatar(name: persona.nombre, size: 16),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: persona.nombre,
+                      style: AppTypography.textTheme.labelSmall?.copyWith(
+                        color: AppColors.slate900,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 11,
+                      ),
+                    ),
+                    if (persona.esExterno)
+                      TextSpan(
+                        text: ' · ext.',
+                        style: AppTypography.textTheme.labelSmall?.copyWith(
+                          color: AppColors.slate500,
+                          fontSize: 10,
+                        ),
+                      ),
+                  ],
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (persona.detalle.isNotEmpty)
+                Text(
+                  persona.detalle,
+                  style: AppTypography.textTheme.labelSmall?.copyWith(
+                    color: AppColors.slate500,
+                    fontSize: 10.5,
+                    height: 1.25,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -623,6 +694,8 @@ class _EsperandoField extends StatefulWidget {
 class _EsperandoFieldState extends State<_EsperandoField> {
   final _nombreLibre = TextEditingController();
   final _detalle = TextEditingController();
+  int? _usuarioSeleccionado;
+  String? _error;
 
   @override
   void dispose() {
@@ -636,129 +709,310 @@ class _EsperandoFieldState extends State<_EsperandoField> {
     return widget.value.any((e) => e.nombre.toLowerCase() == key);
   }
 
-  void _add({required String nombre, int? usuarioId}) {
-    final n = nombre.trim();
-    if (n.isEmpty || _yaEsta(n)) return;
+  void _agregar() {
+    final detalle = _detalle.text.trim();
+    String? nombre;
+    int? usuarioId;
+
+    if (_usuarioSeleccionado != null) {
+      for (final u in widget.usuarios) {
+        if (u.id == _usuarioSeleccionado) {
+          nombre = u.fullName;
+          usuarioId = u.id;
+          break;
+        }
+      }
+    } else if (_nombreLibre.text.trim().isNotEmpty) {
+      nombre = _nombreLibre.text.trim();
+    }
+
+    if (nombre == null || nombre.isEmpty) {
+      setState(() => _error = 'Elige una persona del sistema o escribe un nombre.');
+      return;
+    }
+    if (_yaEsta(nombre)) {
+      setState(() => _error = 'Esa persona ya está en la lista.');
+      return;
+    }
+
     widget.onChanged([
       ...widget.value,
-      TareaEspera(nombre: n, usuarioId: usuarioId, detalle: _detalle.text.trim()),
+      TareaEspera(nombre: nombre, usuarioId: usuarioId, detalle: detalle),
     ]);
-    _nombreLibre.clear();
-    _detalle.clear();
+    setState(() {
+      _usuarioSeleccionado = null;
+      _error = null;
+      _nombreLibre.clear();
+      _detalle.clear();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final value = widget.value;
     final usuarios = widget.usuarios;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text('Esperando a', style: AppTypography.textTheme.labelMedium),
-        const SizedBox(height: 4),
-        Text(
-          'Quién y qué necesitas para seguir (sin límite de personas).',
-          style: AppTypography.textTheme.bodySmall?.copyWith(color: AppColors.slate500),
-        ),
-        const SizedBox(height: 8),
-        if (value.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Column(
-              children: [
-                for (var i = 0; i < value.length; i++)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: InputChip(
-                      isEnabled: true,
-                      label: SizedBox(
-                        width: 280,
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.warningSoft.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.28)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.hourglass_top_rounded, size: 18, color: AppColors.warning),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Esperando a alguien',
+                  style: AppTypography.textTheme.titleSmall?.copyWith(
+                    color: AppColors.slate900,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'De quién dependes para avanzar y qué le pediste. Puedes agregar varias personas.',
+            style: AppTypography.textTheme.bodySmall?.copyWith(color: AppColors.slate500),
+          ),
+          const SizedBox(height: 12),
+          if (value.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+              decoration: BoxDecoration(
+                color: AppColors.white.withValues(alpha: 0.7),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.slate200),
+              ),
+              child: Text(
+                'Nadie en espera todavía. Completa el formulario de abajo.',
+                style: AppTypography.textTheme.bodySmall?.copyWith(color: AppColors.slate500),
+              ),
+            )
+          else ...[
+            Text(
+              'En espera (${value.length})',
+              style: AppTypography.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            for (var i = 0; i < value.length; i++)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 6, 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.slate200),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      AppAvatar(name: value[i].nombre, size: 28),
+                      const SizedBox(width: 10),
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              value[i].esExterno ? '${value[i].nombre} (ext.)' : value[i].nombre,
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                            ),
-                            if (value[i].detalle.isNotEmpty)
-                              Text(
-                                value[i].detalle,
-                                style: TextStyle(fontSize: 11, color: AppColors.slate500),
+                              value[i].esExterno ? '${value[i].nombre} · externo' : value[i].nombre,
+                              style: AppTypography.textTheme.labelMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
                               ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              value[i].detalle.isEmpty
+                                  ? 'Sin detalle de lo pedido'
+                                  : value[i].detalle,
+                              style: AppTypography.textTheme.bodySmall?.copyWith(
+                                color: value[i].detalle.isEmpty
+                                    ? AppColors.slate300
+                                    : AppColors.slate500,
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                      onDeleted: () {
-                        final next = List<TareaEspera>.from(value)..removeAt(i);
-                        widget.onChanged(next);
-                      },
-                    ),
+                      IconButton(
+                        tooltip: 'Quitar',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () {
+                          final next = List<TareaEspera>.from(value)..removeAt(i);
+                          widget.onChanged(next);
+                        },
+                        icon: const Icon(Icons.close, size: 18, color: AppColors.slate500),
+                      ),
+                    ],
                   ),
+                ),
+              ),
+          ],
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.slate200),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Agregar a la lista',
+                  style: AppTypography.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 14),
+                _EsperandoPaso(
+                  numero: '1',
+                  titulo: 'Qué necesitas',
+                  child: AppTextField(
+                    controller: _detalle,
+                    hint: 'Ej. revisar el script, confirmar stock…',
+                    minLines: 1,
+                    maxLines: 3,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                _EsperandoPaso(
+                  numero: '2',
+                  titulo: 'De quién',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (usuarios.isNotEmpty) ...[
+                        DropdownButtonFormField<int?>(
+                          key: ValueKey('esp-${value.length}-$_usuarioSeleccionado'),
+                          initialValue: _usuarioSeleccionado,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Persona del sistema',
+                            prefixIcon: Icon(Icons.person_outline),
+                          ),
+                          items: [
+                            const DropdownMenuItem<int?>(value: null, child: Text('Elegir…')),
+                            for (final u in usuarios)
+                              if (!_yaEsta(u.fullName))
+                                DropdownMenuItem<int?>(
+                                  value: u.id,
+                                  child: Text(u.fullName, overflow: TextOverflow.ellipsis),
+                                ),
+                          ],
+                          onChanged: (id) => setState(() {
+                            _usuarioSeleccionado = id;
+                            if (id != null) _nombreLibre.clear();
+                            _error = null;
+                          }),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          child: Row(
+                            children: [
+                              const Expanded(child: Divider()),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                                child: Text(
+                                  'o nombre libre',
+                                  style: AppTypography.textTheme.labelSmall?.copyWith(
+                                    color: AppColors.slate500,
+                                  ),
+                                ),
+                              ),
+                              const Expanded(child: Divider()),
+                            ],
+                          ),
+                        ),
+                      ],
+                      AppTextField(
+                        controller: _nombreLibre,
+                        hint: 'Ej. proveedor, área externa…',
+                        enabled: _usuarioSeleccionado == null,
+                        onChanged: (_) {
+                          if (_error != null) setState(() => _error = null);
+                        },
+                        onSubmitted: (_) => _agregar(),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    _error!,
+                    style: AppTypography.textTheme.bodySmall?.copyWith(color: AppColors.danger),
+                  ),
+                ],
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _agregar,
+                    icon: const Icon(Icons.person_add_alt_1, size: 18),
+                    label: const Text('Agregar persona'),
+                  ),
+                ),
               ],
             ),
           ),
-        AppTextField(
-          controller: _detalle,
-          label: 'Qué necesito',
-          hint: 'Ej. revisar el script, confirmar stock…',
-          minLines: 1,
-          maxLines: 3,
-        ),
-        const SizedBox(height: 10),
-        if (usuarios.isNotEmpty)
-          DropdownButtonFormField<int?>(
-            key: ValueKey(value.map((e) => e.nombre).join('|')),
-            initialValue: null,
-            isExpanded: true,
-            decoration: const InputDecoration(
-              labelText: 'Agregar del sistema',
-              prefixIcon: Icon(Icons.group_add_outlined),
-            ),
-            items: [
-              const DropdownMenuItem<int?>(value: null, child: Text('Elegir persona…')),
-              for (final u in usuarios)
-                if (!_yaEsta(u.fullName))
-                  DropdownMenuItem<int?>(
-                    value: u.id,
-                    child: Text(u.fullName, overflow: TextOverflow.ellipsis),
-                  ),
-            ],
-            onChanged: (id) {
-              if (id == null) return;
-              AssignableUser? u;
-              for (final x in usuarios) {
-                if (x.id == id) {
-                  u = x;
-                  break;
-                }
-              }
-              if (u == null) return;
-              _add(nombre: u.fullName, usuarioId: u.id);
-            },
-          ),
-        const SizedBox(height: 10),
+        ],
+      ),
+    );
+  }
+}
+
+class _EsperandoPaso extends StatelessWidget {
+  const _EsperandoPaso({
+    required this.numero,
+    required this.titulo,
+    required this.child,
+  });
+
+  final String numero;
+  final String titulo;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
         Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Expanded(
-              child: AppTextField(
-                controller: _nombreLibre,
-                label: 'Nombre libre',
-                hint: 'Quien no está en el sistema',
-                onSubmitted: (_) => _add(nombre: _nombreLibre.text),
+            Container(
+              width: 22,
+              height: 22,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(
+                color: AppColors.brand600,
+                shape: BoxShape.circle,
+              ),
+              child: Text(
+                numero,
+                style: const TextStyle(
+                  color: AppColors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
             const SizedBox(width: 8),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 2),
-              child: IconButton.filled(
-                tooltip: 'Agregar',
-                onPressed: () => _add(nombre: _nombreLibre.text),
-                icon: const Icon(Icons.add, size: 20),
-              ),
+            Text(
+              titulo,
+              style: AppTypography.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
             ),
           ],
         ),
+        const SizedBox(height: 8),
+        child,
       ],
     );
   }
