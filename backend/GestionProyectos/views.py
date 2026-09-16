@@ -455,13 +455,21 @@ _ROL_POR_GRUPO = (
 
 
 def _asignables_qs():
-    """Usuarios asignables / ranking: solo grupos gp_desarrollador, gp_lider_area, gp_gestor.
-    No incluye superusers: una cuenta de servicio (Power Automate, etc.) con is_superuser
-    no debe salir en reportes ni en el dropdown de asignación."""
+    """Usuarios del dropdown de asignación: desarrollador, líder o gestor (grupos gp_*).
+    No incluye superusers sin esos grupos."""
     return (
         User.objects.filter(
             groups__name__in=[GROUP_DESARROLLADOR, GROUP_LIDER_AREA, GROUP_GESTOR]
         )
+        .distinct()
+        .order_by('first_name', 'last_name', 'username')
+    )
+
+
+def _desarrolladores_ranking_qs():
+    """Ranking de Reportes: solo gp_desarrollador (no líderes ni gestores)."""
+    return (
+        User.objects.filter(groups__name=GROUP_DESARROLLADOR)
         .distinct()
         .order_by('first_name', 'last_name', 'username')
     )
@@ -601,7 +609,7 @@ class GP_ProductividadViewSet(viewsets.ViewSet):
             for t in GP_Tarea.objects.filter(id__in=tarea_ids).select_related('asignado_a')
         }
 
-        developers = _asignables_qs()
+        developers = _desarrolladores_ranking_qs()
         ranking_map = {}
         for u in developers:
             ranking_map[u.id] = {
