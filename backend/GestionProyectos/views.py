@@ -6,6 +6,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils.dateparse import parse_date
@@ -487,9 +488,49 @@ def _rol_display(user, group_names=None):
 
 def _texto_relacionado(valor):
     """Nombre legible de un campo de ExtendedUsers que puede ser texto o un objeto relacionado."""
-    if valor is None or isinstance(valor, (bool, int, float)):
+    if valor is None or valor == '':
         return None
-    return str(valor) or None
+    if isinstance(valor, (bool, int, float)):
+        return None
+    if isinstance(valor, dict):
+        nombre = valor.get('nombre') or valor.get('name')
+        return str(nombre).strip() or None if nombre is not None else None
+    nombre = getattr(valor, 'nombre', None) or getattr(valor, 'name', None)
+    if nombre is not None and str(nombre).strip():
+        return str(nombre).strip()
+    texto = str(valor).strip()
+    return texto or None
+
+
+def _catalogo_nombre(model_names, pk):
+    """Resuelve EU_*.nombre por pk sin acoplar a un app label fijo."""
+    try:
+        pk = int(pk)
+    except (TypeError, ValueError):
+        return None
+    names = set(model_names)
+    for model in apps.get_models():
+        if model.__name__ not in names and getattr(model._meta, 'db_table', '') not in names:
+            continue
+        nombre = model.objects.filter(pk=pk).values_list('nombre', flat=True).first()
+        if nombre:
+            return str(nombre).strip() or None
+    return None
+
+
+def _campo_usuario(user, *attrs, catalogos=()):
+    """Primer valor legible entre attrs de ExtendedUsers (texto, FK o id de catálogo)."""
+    for attr in attrs:
+        valor = getattr(user, attr, None)
+        texto = _texto_relacionado(valor)
+        if texto:
+            return texto
+        if catalogos and valor is not None:
+            pk = valor.pk if hasattr(valor, 'pk') else valor
+            texto = _catalogo_nombre(catalogos, pk)
+            if texto:
+                return texto
+    return None
 
 
 class GP_UsuarioViewSet(viewsets.ViewSet):
@@ -538,9 +579,13 @@ class GP_UsuarioViewSet(viewsets.ViewSet):
                 'full_name': _user_display_name(user),
                 'email': user.email or '',
                 'groups': group_names,
-                'area': _texto_relacionado(getattr(user, 'area', None)),
+                # En prod ExtendedUsers trae area (texto) + area_id (FK);
+                # puesto suele venir solo como puesto_id (FK a EU_Puesto).
+                'area': _campo_usuario(user, 'area', 'area_id', catalogos=('EU_Area',)),
                 'area_id': get_user_area_id(user),
-                'puesto': _texto_relacionado(getattr(user, 'puesto', None)),
+                'puesto': _campo_usuario(
+                    user, 'puesto', 'puesto_id', catalogos=('EU_Puesto',)
+                ),
                 'rol': _rol_display(user, set(group_names)),
                 'is_staff': bool(user.is_staff),
                 # Calculados con los mismos helpers que autorizan las peticiones,
