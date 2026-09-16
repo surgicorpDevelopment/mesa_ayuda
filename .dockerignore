@@ -1,7 +1,9 @@
 .git
 .idea
 .dart_tool
-# build/ se genera en el host y Dockerfile.nginx lo necesita en el contexto
+# NO ignorar "assets" ni "icons": Docker aplicaria el patron a
+# deploy/webdist/assets y la app quedaria en blanco.
+# deploy/webdist lo llena update-frontend.ps1 (robocopy de build/web).
 .flutter-plugins
 .flutter-plugins-dependencies
 **/doc/api/
