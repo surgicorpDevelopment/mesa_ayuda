@@ -69,6 +69,7 @@ class MockDataStore {
         titulo: 'App de Cajas de traslado',
         descripcion: 'Escaneo y seguimiento de cajas entre almacenes.',
         areaId: 15,
+        areaNombre: 'Desarrollo Software',
         estado: 'en_proceso',
         prioridad: 'alta',
         responsableId: 3,
@@ -85,6 +86,7 @@ class MockDataStore {
         titulo: 'Mejoras módulo Cotizaciones',
         descripcion: 'Arreglar pa_si_producto y flujo de adicionales.',
         areaId: 15,
+        areaNombre: 'Desarrollo Software',
         estado: 'idea',
         prioridad: 'media',
         responsableId: 3,
@@ -101,6 +103,7 @@ class MockDataStore {
         titulo: 'Portal vacaciones v2',
         descripcion: 'Rediseño UX y reportes para RRHH.',
         areaId: 15,
+        areaNombre: 'Desarrollo Software',
         estado: 'completado',
         prioridad: 'baja',
         responsableId: 12,
@@ -764,6 +767,14 @@ class MockDataStore {
 
   List<AreaOption> listAreas() => List<AreaOption>.from(areas);
 
+  String? nombreArea(int? areaId) {
+    if (areaId == null) return null;
+    for (final a in areas) {
+      if (a.id == areaId) return a.nombre;
+    }
+    return null;
+  }
+
   List<AssignableUser> listAssignableUsers({String? query}) {
     var list = List<AssignableUser>.from(assignableUsers);
     final q = query?.trim().toLowerCase();
@@ -939,11 +950,13 @@ class MockDataStore {
     final responsableNombre = responsableId == userId
         ? userName
         : (nameForUser(responsableId) ?? 'Usuario #$responsableId');
+    final areaId = body['area_id'] as int?;
     final p = Proyecto(
       id: _proyectoSeq,
       titulo: (body['titulo'] ?? '') as String,
       descripcion: (body['descripcion'] ?? '') as String,
-      areaId: body['area_id'] as int?,
+      areaId: areaId,
+      areaNombre: nombreArea(areaId),
       estado: (body['estado'] ?? 'idea') as String,
       prioridad: (body['prioridad'] ?? 'media') as String,
       responsableId: responsableId,
@@ -983,11 +996,13 @@ class MockDataStore {
             ? null
             : (nameForUser(newResponsableId) ?? 'Usuario #$newResponsableId'))
         : cur.responsableNombre;
+    final newAreaId = body.containsKey('area_id') ? body['area_id'] as int? : cur.areaId;
     final updated = Proyecto(
       id: cur.id,
       titulo: (body['titulo'] as String?) ?? cur.titulo,
       descripcion: (body['descripcion'] as String?) ?? cur.descripcion,
-      areaId: body.containsKey('area_id') ? body['area_id'] as int? : cur.areaId,
+      areaId: newAreaId,
+      areaNombre: body.containsKey('area_id') ? nombreArea(newAreaId) : cur.areaNombre,
       estado: (body['estado'] as String?) ?? cur.estado,
       prioridad: (body['prioridad'] as String?) ?? cur.prioridad,
       responsableId: newResponsableId,

@@ -3,6 +3,7 @@ class Proyecto {
   final String titulo;
   final String descripcion;
   final int? areaId;
+  final String? areaNombre;
   final String estado;
   final String prioridad;
   final int? responsableId;
@@ -20,6 +21,7 @@ class Proyecto {
     required this.titulo,
     this.descripcion = '',
     this.areaId,
+    this.areaNombre,
     this.estado = 'idea',
     this.prioridad = 'media',
     this.responsableId,
@@ -58,6 +60,7 @@ class Proyecto {
       titulo: (json['titulo'] ?? '') as String,
       descripcion: (json['descripcion'] ?? '') as String,
       areaId: json['area_id'] as int?,
+      areaNombre: json['area_nombre'] as String?,
       estado: (json['estado'] ?? 'idea') as String,
       prioridad: (json['prioridad'] ?? 'media') as String,
       responsableId: json['responsable'] as int?,

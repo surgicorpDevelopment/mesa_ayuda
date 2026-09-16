@@ -131,7 +131,7 @@ class _ProyectosListPageState extends State<ProyectosListPage> {
                               padding: const EdgeInsets.fromLTRB(24, 8, 24, 88),
                               gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                                 maxCrossAxisExtent: 380,
-                                mainAxisExtent: 248,
+                                mainAxisExtent: 268,
                                 crossAxisSpacing: 12,
                                 mainAxisSpacing: 12,
                               ),
@@ -181,6 +181,25 @@ class _ProyectosListPageState extends State<ProyectosListPage> {
                                         ),
                                       ),
                                       const SizedBox(height: 8),
+                                      if (p.areaNombre != null && p.areaNombre!.isNotEmpty) ...[
+                                        Row(
+                                          children: [
+                                            Icon(Icons.business_outlined, size: 14, color: AppColors.slate500),
+                                            const SizedBox(width: 4),
+                                            Expanded(
+                                              child: Text(
+                                                p.areaNombre!,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: AppTypography.textTheme.labelSmall?.copyWith(
+                                                  color: AppColors.slate500,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 6),
+                                      ],
                                       Text(
                                         formatDateRange(p.fechaInicio, p.fechaFin),
                                         style: AppTypography.textTheme.labelSmall?.copyWith(
@@ -487,6 +506,10 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
   bool _savingAdjunto = false;
   bool _loadingHistorial = false;
   bool _deleting = false;
+  bool _savingTexto = false;
+
+  final _titulo = TextEditingController();
+  final _desc = TextEditingController();
 
   late final TabController _tabController;
 
@@ -494,13 +517,29 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _titulo.addListener(() => setState(() {}));
+    _desc.addListener(() => setState(() {}));
     _load();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _titulo.dispose();
+    _desc.dispose();
     super.dispose();
+  }
+
+  void _syncTextoFromProyecto(Proyecto p) {
+    if (_titulo.text != p.titulo) _titulo.text = p.titulo;
+    if (_desc.text != p.descripcion) _desc.text = p.descripcion;
+  }
+
+  bool get _textoDirty {
+    final p = _proyecto;
+    if (p == null) return false;
+    return _titulo.text.trim() != p.titulo.trim() ||
+        _desc.text.trim() != p.descripcion.trim();
   }
 
   Future<void> _load() async {
@@ -516,12 +555,14 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
         api.fetchAssignableUsers(),
       ]);
       if (mounted) {
+        final p = results[0] as Proyecto;
         setState(() {
-          _proyecto = results[0] as Proyecto;
+          _proyecto = p;
           _tareas = results[1] as List<Tarea>;
           _usuarios = results[2] as List<AssignableUser>;
           _loading = false;
         });
+        _syncTextoFromProyecto(p);
         _loadHistorial();
       }
     } catch (e) {
@@ -585,6 +626,34 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
+  Future<void> _saveTexto() async {
+    final titulo = _titulo.text.trim();
+    if (titulo.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('El título no puede estar vacío.')),
+      );
+      return;
+    }
+    setState(() => _savingTexto = true);
+    try {
+      final p = await context.read<AuthProvider>().api.updateProyecto(widget.id, {
+        'titulo': titulo,
+        'descripcion': _desc.text.trim(),
+      });
+      if (!mounted) return;
+      setState(() => _proyecto = p);
+      _syncTextoFromProyecto(p);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Proyecto actualizado')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    } finally {
+      if (mounted) setState(() => _savingTexto = false);
     }
   }
 
@@ -835,10 +904,31 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
                 ],
               ),
               const SizedBox(height: 14),
-              Text(
-                p.descripcion.isEmpty ? 'Sin descripción' : p.descripcion,
-                style: AppTypography.textTheme.bodyLarge,
-              ),
+              if (canManage) ...[
+                AppTextField(controller: _titulo, label: 'Título'),
+                const SizedBox(height: 14),
+                AppTextField(
+                  controller: _desc,
+                  label: 'Descripción',
+                  minLines: 4,
+                  maxLines: 10,
+                ),
+                if (_textoDirty) ...[
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: AppButton(
+                      label: 'Guardar cambios',
+                      loading: _savingTexto,
+                      onPressed: _savingTexto ? null : _saveTexto,
+                    ),
+                  ),
+                ],
+              ] else
+                Text(
+                  p.descripcion.isEmpty ? 'Sin descripción' : p.descripcion,
+                  style: AppTypography.textTheme.bodyLarge,
+                ),
               const SizedBox(height: 12),
               if (canManage)
                 DropdownButtonFormField<int?>(

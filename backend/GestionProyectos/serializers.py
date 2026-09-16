@@ -1,9 +1,31 @@
+from __future__ import annotations
+
+from django.apps import apps
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
 from .models import GP_Comentario, GP_HistorialEstado, GP_Proyecto, GP_ProyectoAdjunto, GP_Sistema, GP_Tarea, GP_Ticket, GP_TicketAdjunto, TipoEntidad
 
 User = get_user_model()
+
+_AREA_CACHE = {}
+
+
+def _area_nombre(area_id):
+    """Resuelve EU_Area.nombre sin acoplar GestionProyectos a un app label fijo."""
+    if area_id is None:
+        return None
+    if area_id in _AREA_CACHE:
+        return _AREA_CACHE[area_id]
+    nombre = None
+    for model in apps.get_models():
+        if model.__name__ != 'EU_Area' and getattr(model._meta, 'db_table', '') != 'EU_Area':
+            continue
+        nombre = model.objects.filter(pk=area_id).values_list('nombre', flat=True).first()
+        if nombre:
+            break
+    _AREA_CACHE[area_id] = nombre
+    return nombre
 
 
 class UserMiniSerializer(serializers.ModelSerializer):
@@ -54,6 +76,7 @@ class GP_ProyectoSerializer(serializers.ModelSerializer):
     creado_por_detail = UserMiniSerializer(source='creado_por', read_only=True)
     tickets_count = serializers.IntegerField(source='tickets.count', read_only=True)
     adjuntos = GP_ProyectoAdjuntoSerializer(many=True, read_only=True)
+    area_nombre = serializers.SerializerMethodField()
 
     class Meta:
         model = GP_Proyecto
@@ -62,6 +85,7 @@ class GP_ProyectoSerializer(serializers.ModelSerializer):
             'titulo',
             'descripcion',
             'area_id',
+            'area_nombre',
             'estado',
             'prioridad',
             'responsable',
@@ -75,7 +99,10 @@ class GP_ProyectoSerializer(serializers.ModelSerializer):
             'fecha_actualizacion',
             'tickets_count',
         ]
-        read_only_fields = ['creado_por', 'fecha_creacion', 'fecha_actualizacion']
+        read_only_fields = ['creado_por', 'fecha_creacion', 'fecha_actualizacion', 'area_nombre']
+
+    def get_area_nombre(self, obj):
+        return _area_nombre(obj.area_id)
 
     def validate(self, attrs):
         instance = self.instance
