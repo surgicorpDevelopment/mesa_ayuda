@@ -935,6 +935,10 @@ class MockDataStore {
 
   Proyecto createProyecto(Map<String, dynamic> body, {required int userId, required String userName}) {
     _proyectoSeq += 1;
+    final responsableId = (body['responsable'] as int?) ?? userId;
+    final responsableNombre = responsableId == userId
+        ? userName
+        : (nameForUser(responsableId) ?? 'Usuario #$responsableId');
     final p = Proyecto(
       id: _proyectoSeq,
       titulo: (body['titulo'] ?? '') as String,
@@ -942,8 +946,8 @@ class MockDataStore {
       areaId: body['area_id'] as int?,
       estado: (body['estado'] ?? 'idea') as String,
       prioridad: (body['prioridad'] ?? 'media') as String,
-      responsableId: (body['responsable'] as int?) ?? userId,
-      responsableNombre: userName,
+      responsableId: responsableId,
+      responsableNombre: responsableNombre,
       creadoPorId: userId,
       fechaInicio: _parseDate(body['fecha_inicio']),
       fechaObjetivo: _parseDate(body['fecha_objetivo']),
@@ -972,6 +976,13 @@ class MockDataStore {
     final i = proyectos.indexWhere((p) => p.id == id);
     if (i < 0) throw StateError('Proyecto $id no encontrado');
     final cur = proyectos[i];
+    final newResponsableId =
+        body.containsKey('responsable') ? body['responsable'] as int? : cur.responsableId;
+    final newResponsableNombre = body.containsKey('responsable')
+        ? (newResponsableId == null
+            ? null
+            : (nameForUser(newResponsableId) ?? 'Usuario #$newResponsableId'))
+        : cur.responsableNombre;
     final updated = Proyecto(
       id: cur.id,
       titulo: (body['titulo'] as String?) ?? cur.titulo,
@@ -979,8 +990,8 @@ class MockDataStore {
       areaId: body.containsKey('area_id') ? body['area_id'] as int? : cur.areaId,
       estado: (body['estado'] as String?) ?? cur.estado,
       prioridad: (body['prioridad'] as String?) ?? cur.prioridad,
-      responsableId: body.containsKey('responsable') ? body['responsable'] as int? : cur.responsableId,
-      responsableNombre: cur.responsableNombre,
+      responsableId: newResponsableId,
+      responsableNombre: newResponsableNombre,
       creadoPorId: cur.creadoPorId,
       fechaInicio: body.containsKey('fecha_inicio') ? _parseDate(body['fecha_inicio']) : cur.fechaInicio,
       fechaObjetivo: body.containsKey('fecha_objetivo')

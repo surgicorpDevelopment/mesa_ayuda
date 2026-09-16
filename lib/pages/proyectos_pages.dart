@@ -244,10 +244,13 @@ class _ProyectoFormPageState extends State<ProyectoFormPage> {
   String _prioridad = 'media';
   String _estado = 'idea';
   int? _areaId;
+  int? _responsableId;
   DateTime? _fechaInicio;
   DateTime? _fechaFin;
   List<AreaOption> _areas = [];
+  List<AssignableUser> _responsables = [];
   bool _loadingAreas = false;
+  bool _loadingResponsables = false;
   bool _saving = false;
 
   @override
@@ -255,7 +258,9 @@ class _ProyectoFormPageState extends State<ProyectoFormPage> {
     super.initState();
     final user = context.read<AuthProvider>().user;
     _areaId = user?.areaId;
+    _responsableId = user?.id;
     if (user?.isLider == true) _loadAreas();
+    _loadResponsables();
   }
 
   Future<void> _loadAreas() async {
@@ -265,6 +270,28 @@ class _ProyectoFormPageState extends State<ProyectoFormPage> {
       if (mounted) setState(() { _areas = list; _loadingAreas = false; });
     } catch (_) {
       if (mounted) setState(() => _loadingAreas = false);
+    }
+  }
+
+  Future<void> _loadResponsables() async {
+    setState(() => _loadingResponsables = true);
+    try {
+      final list = await context.read<AuthProvider>().api.fetchAssignableUsers();
+      if (!mounted) return;
+      setState(() {
+        _responsables = list;
+        _loadingResponsables = false;
+        // Asegura que el usuario actual esté en la lista aunque no venga del API.
+        final me = context.read<AuthProvider>().user;
+        if (me != null && !_responsables.any((u) => u.id == me.id)) {
+          _responsables = [
+            AssignableUser(id: me.id, fullName: me.fullName, username: me.username),
+            ..._responsables,
+          ];
+        }
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loadingResponsables = false);
     }
   }
 
@@ -295,7 +322,7 @@ class _ProyectoFormPageState extends State<ProyectoFormPage> {
         'prioridad': _prioridad,
         'estado': _estado,
         'area_id': _areaId ?? auth.user?.areaId,
-        'responsable': auth.user?.id,
+        'responsable': _responsableId ?? auth.user?.id,
         'fecha_inicio': _fechaInicio?.toIso8601String().split('T').first,
         'fecha_objetivo': _fechaFin?.toIso8601String().split('T').first,
       });
@@ -376,6 +403,37 @@ class _ProyectoFormPageState extends State<ProyectoFormPage> {
                       ],
                       onChanged: (v) => setState(() => _prioridad = v ?? 'media'),
                     ),
+                    const SizedBox(height: 14),
+                    if (_loadingResponsables)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        child: LinearProgressIndicator(minHeight: 2),
+                      )
+                    else
+                      DropdownButtonFormField<int?>(
+                        key: ValueKey(_responsableId),
+                        initialValue: _responsableId,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Responsable',
+                          prefixIcon: Icon(Icons.person_outline),
+                        ),
+                        items: [
+                          const DropdownMenuItem<int?>(
+                            value: null,
+                            child: Text('Sin responsable'),
+                          ),
+                          for (final u in _responsables)
+                            DropdownMenuItem<int?>(
+                              value: u.id,
+                              child: Text(
+                                u.rol != null ? '${u.fullName} · ${u.rol}' : u.fullName,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                        ],
+                        onChanged: (v) => setState(() => _responsableId = v),
+                      ),
                     const SizedBox(height: 14),
                     Row(
                       children: [
@@ -492,11 +550,38 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
     }
   }
 
+  List<AssignableUser> get _dropdownResponsables {
+    final list = List<AssignableUser>.from(_usuarios);
+    final p = _proyecto;
+    if (p?.responsableId != null && !list.any((u) => u.id == p!.responsableId)) {
+      list.insert(
+        0,
+        AssignableUser(
+          id: p!.responsableId!,
+          fullName: p.responsableNombre ?? 'Usuario #${p.responsableId}',
+        ),
+      );
+    }
+    return list;
+  }
+
   Future<void> _setEstado(String estado) async {
     try {
       final p = await context.read<AuthProvider>().api.updateProyecto(widget.id, {'estado': estado});
       if (mounted) setState(() => _proyecto = p);
       await _loadHistorial();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
+  Future<void> _setResponsable(int? responsableId) async {
+    try {
+      final p = await context.read<AuthProvider>().api.updateProyecto(widget.id, {
+        'responsable': responsableId,
+      });
+      if (mounted) setState(() => _proyecto = p);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
@@ -755,16 +840,42 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
                 style: AppTypography.textTheme.bodyLarge,
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  AppAvatar(name: p.responsableNombre ?? '—', size: 30),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Responsable: ${p.responsableNombre ?? "—"}',
-                    style: AppTypography.textTheme.bodySmall,
+              if (canManage)
+                DropdownButtonFormField<int?>(
+                  key: ValueKey(p.responsableId),
+                  initialValue: p.responsableId,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Responsable',
+                    prefixIcon: Icon(Icons.person_outline),
                   ),
-                ],
-              ),
+                  items: [
+                    const DropdownMenuItem<int?>(
+                      value: null,
+                      child: Text('Sin responsable'),
+                    ),
+                    for (final u in _dropdownResponsables)
+                      DropdownMenuItem<int?>(
+                        value: u.id,
+                        child: Text(
+                          u.rol != null ? '${u.fullName} · ${u.rol}' : u.fullName,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: _setResponsable,
+                )
+              else
+                Row(
+                  children: [
+                    AppAvatar(name: p.responsableNombre ?? '—', size: 30),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Responsable: ${p.responsableNombre ?? "—"}',
+                      style: AppTypography.textTheme.bodySmall,
+                    ),
+                  ],
+                ),
               const SizedBox(height: 16),
               if (canManage)
                 Row(
