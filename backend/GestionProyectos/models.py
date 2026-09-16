@@ -288,6 +288,11 @@ class GP_Tarea(models.Model):
         blank=True,
         related_name='gp_tareas_asignadas',
     )
+    esperando = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='Personas de las que depende la tarea: [{nombre, usuario_id?, detalle}, ...]',
+    )
     orden = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

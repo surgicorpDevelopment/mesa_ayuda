@@ -200,8 +200,9 @@ Color estadoColor(String e) {
     case 'idea':
     case 'pendiente':
       return AppColors.info;
-    case 'en_proceso':
     case 'planificado':
+      return AppColors.brand600;
+    case 'en_proceso':
     case 'en_progreso':
       return AppColors.warning;
     case 'esperando':
@@ -211,8 +212,9 @@ Color estadoColor(String e) {
     case 'completado':
     case 'hecho':
       return AppColors.success;
-    case 'cerrado':
     case 'cancelado':
+      return AppColors.danger;
+    case 'cerrado':
       return AppColors.slate500;
     default:
       return AppColors.muted;
@@ -225,8 +227,9 @@ Color estadoSoft(String e) {
     case 'idea':
     case 'pendiente':
       return AppColors.infoSoft;
-    case 'en_proceso':
     case 'planificado':
+      return AppColors.brand50;
+    case 'en_proceso':
     case 'en_progreso':
       return AppColors.warningSoft;
     case 'esperando':
@@ -236,8 +239,9 @@ Color estadoSoft(String e) {
     case 'completado':
     case 'hecho':
       return AppColors.successSoft;
-    case 'cerrado':
     case 'cancelado':
+      return AppColors.dangerSoft;
+    case 'cerrado':
       return AppColors.slate100;
     default:
       return AppColors.slate100;

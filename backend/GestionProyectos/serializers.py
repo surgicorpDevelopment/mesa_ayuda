@@ -133,6 +133,7 @@ class GP_TareaSerializer(serializers.ModelSerializer):
             'estado',
             'asignado_a',
             'asignado_a_nombre',
+            'esperando',
             'orden',
             'proyecto',
             'created_at',
@@ -146,6 +147,40 @@ class GP_TareaSerializer(serializers.ModelSerializer):
             return None
         name = f'{u.first_name or ""} {u.last_name or ""}'.strip()
         return name or u.username
+
+    def validate_esperando(self, value):
+        if value in (None, ''):
+            return []
+        if not isinstance(value, list):
+            raise serializers.ValidationError('Debe ser una lista de personas.')
+        cleaned = []
+        seen = set()
+        for item in value:
+            if not isinstance(item, dict):
+                raise serializers.ValidationError('Cada persona debe ser un objeto {nombre, usuario_id}.')
+            nombre = str(item.get('nombre') or '').strip()
+            if not nombre:
+                raise serializers.ValidationError('El nombre no puede estar vacío.')
+            key = nombre.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            usuario_id = item.get('usuario_id')
+            if usuario_id in ('', None):
+                usuario_id = None
+            elif isinstance(usuario_id, int):
+                pass
+            else:
+                try:
+                    usuario_id = int(usuario_id)
+                except (TypeError, ValueError):
+                    raise serializers.ValidationError('usuario_id debe ser un entero o nulo.')
+            cleaned.append({
+                'nombre': nombre,
+                'usuario_id': usuario_id,
+                'detalle': str(item.get('detalle') or '').strip(),
+            })
+        return cleaned
 
 
 class GP_TicketAdjuntoSerializer(serializers.ModelSerializer):

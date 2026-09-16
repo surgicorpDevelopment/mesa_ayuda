@@ -348,6 +348,17 @@ class MockDataStore {
         asignadoAId: 12,
         asignadoANombre: 'Jairo Mendoza',
         proyectoId: 1,
+        esperando: const [
+          TareaEspera(
+            nombre: 'Jeshua Cabanillas',
+            usuarioId: 3,
+            detalle: 'Validar el contrato de la API de movimiento',
+          ),
+          TareaEspera(
+            nombre: 'Ana Quispe',
+            detalle: 'Confirmar reglas de picking en almacén',
+          ),
+        ],
         fechaCreacion: now.subtract(const Duration(days: 10)),
         fechaActualizacion: now.subtract(const Duration(days: 2)),
       ),
@@ -1137,6 +1148,7 @@ class MockDataStore {
       asignadoAId: body['asignado_a'] as int?,
       asignadoANombre: asignadoNombre,
       proyectoId: body['proyecto'] as int,
+      esperando: parseEsperando(body['esperando']),
       fechaCreacion: DateTime.now(),
       fechaActualizacion: DateTime.now(),
     );
@@ -1172,6 +1184,7 @@ class MockDataStore {
       asignadoAId: newAsignadoId,
       asignadoANombre: newAsignadoNombre,
       proyectoId: cur.proyectoId,
+      esperando: body.containsKey('esperando') ? parseEsperando(body['esperando']) : cur.esperando,
       fechaCreacion: cur.fechaCreacion,
       fechaActualizacion: DateTime.now(),
     );

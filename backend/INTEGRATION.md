@@ -31,7 +31,7 @@ python manage.py setup_gp_groups
 python manage.py seed_gp_sistemas
 ```
 
-Las migraciones 0001–0007 vienen en el repo: usar `migrate` directo, **sin**
+Las migraciones 0001–0008 vienen en el repo: usar `migrate` directo, **sin**
 `makemigrations`, para no generar una migración duplicada en el servidor.
 
 `0001_initial` depende de `ServidorCaminitos.0170_...` (igual que CajaChica),
@@ -111,6 +111,19 @@ tareas). El frontend lo usa en el detalle; no hay que mandar eventos a mano.
 
 Los hitos de un ticket (atendido / resuelto / cerrado) se derivan de ese historial:
 primera vez en `en_proceso`, `resuelto` y `cerrado`.
+
+### Tareas: `esperando`
+
+`GP_Tarea.esperando` es una lista JSON (0…N personas) de las que depende la tarea.
+No cambia el estado Kanban. Cada ítem:
+
+```json
+{ "nombre": "María López", "usuario_id": 12, "detalle": "Revisar el script de migración" }
+```
+
+- Nombre libre: `"usuario_id": null`.
+- Usuario del sistema: `nombre` + `usuario_id` (para un futuro aviso por correo).
+- `detalle`: qué se le pide a esa persona (texto libre, puede ir vacío).
 
 ### `GET /GP_Usuario/me/`
 

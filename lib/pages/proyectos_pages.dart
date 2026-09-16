@@ -587,16 +587,29 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
   }
 
   List<AssignableUser> get _dropdownResponsables {
-    final list = List<AssignableUser>.from(_usuarios);
+    final seen = <int>{};
+    final list = <AssignableUser>[];
+    for (final u in _usuarios) {
+      if (seen.add(u.id)) list.add(u);
+    }
     final p = _proyecto;
-    if (p?.responsableId != null && !list.any((u) => u.id == p!.responsableId)) {
+    if (p?.responsableId != null && seen.add(p!.responsableId!)) {
       list.insert(
         0,
         AssignableUser(
-          id: p!.responsableId!,
+          id: p.responsableId!,
           fullName: p.responsableNombre ?? 'Usuario #${p.responsableId}',
         ),
       );
+    }
+    return list;
+  }
+
+  List<AreaOption> get _areasDistinct {
+    final seen = <int>{};
+    final list = <AreaOption>[];
+    for (final a in _areas) {
+      if (seen.add(a.id)) list.add(a);
     }
     return list;
   }
@@ -750,6 +763,7 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
           asignadoAId: tarea.asignadoAId,
           asignadoANombre: tarea.asignadoANombre,
           proyectoId: tarea.proyectoId,
+          esperando: tarea.esperando,
           fechaCreacion: tarea.fechaCreacion,
           fechaActualizacion: DateTime.now(),
         );
@@ -777,13 +791,19 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
 
   // ── Kanban: crear tarea ─────────────────────────────────────────────────
 
-  Future<void> _createTarea(String titulo, String estado, int? asignadoAId) async {
+  Future<void> _createTarea(
+    String titulo,
+    String estado,
+    int? asignadoAId,
+    List<TareaEspera> esperando,
+  ) async {
     try {
       final tarea = await context.read<AuthProvider>().api.createTarea({
         'titulo': titulo,
         'estado': estado,
         'proyecto': widget.id,
         if (asignadoAId != null) 'asignado_a': asignadoAId,
+        'esperando': esperando.map((e) => e.toJson()).toList(),
       });
       if (mounted) setState(() => _tareas.add(tarea));
     } catch (e) {
@@ -807,12 +827,21 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
     }
   }
 
-  // ── Kanban: cambiar responsable ────────────────────────────────────────
+  // ── Kanban: editar tarea ───────────────────────────────────────────────
 
-  Future<void> _assignTarea(Tarea tarea, int? asignadoAId) async {
+  Future<void> _updateTarea(
+    Tarea tarea, {
+    required String titulo,
+    required String descripcion,
+    required int? asignadoAId,
+    required List<TareaEspera> esperando,
+  }) async {
     try {
       final updated = await context.read<AuthProvider>().api.updateTarea(tarea.id, {
+        'titulo': titulo,
+        'descripcion': descripcion,
         'asignado_a': asignadoAId,
+        'esperando': esperando.map((e) => e.toJson()).toList(),
       });
       if (mounted) {
         setState(() {
@@ -1006,9 +1035,9 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
                   ),
                   items: [
                     const DropdownMenuItem<int?>(value: null, child: Text('Sin área')),
-                    for (final a in _areas)
+                    for (final a in _areasDistinct)
                       DropdownMenuItem<int?>(value: a.id, child: Text(a.nombre)),
-                    if (p.areaId != null && !_areas.any((a) => a.id == p.areaId))
+                    if (p.areaId != null && !_areasDistinct.any((a) => a.id == p.areaId))
                       DropdownMenuItem<int?>(
                         value: p.areaId,
                         child: Text(p.areaNombre ?? 'Área #${p.areaId}'),
@@ -1160,7 +1189,7 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
       onMove: _moveTarea,
       onCreate: _createTarea,
       onDelete: puedeBorrar ? _deleteTarea : null,
-      onAssign: _assignTarea,
+      onUpdate: _updateTarea,
     );
   }
 }

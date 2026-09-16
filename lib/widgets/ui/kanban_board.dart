@@ -21,7 +21,7 @@ class _ColumnDef {
 ///
 /// - Arrastra una tarjeta hacia otra columna para cambiar su estado.
 /// - Presiona "+" en cualquier columna para crear una tarea rápida.
-/// - Toca el asignado (o "Asignar") para cambiar el responsable.
+/// - Toca el lápiz / asignado para editar título, descripción y responsable.
 /// - Presiona la "×" en una tarjeta para eliminarla.
 class KanbanBoard extends StatefulWidget {
   const KanbanBoard({
@@ -29,19 +29,30 @@ class KanbanBoard extends StatefulWidget {
     required this.tareas,
     required this.onMove,
     required this.onCreate,
-    required this.onAssign,
+    required this.onUpdate,
     this.onDelete,
     this.usuarios = const [],
   });
 
   final List<Tarea> tareas;
   final void Function(Tarea tarea, String nuevoEstado) onMove;
-  final void Function(String titulo, String estado, int? asignadoAId) onCreate;
+  final void Function(
+    String titulo,
+    String estado,
+    int? asignadoAId,
+    List<TareaEspera> esperando,
+  ) onCreate;
 
   /// Nulo cuando el usuario no puede borrar tareas: la API solo lo permite a
   /// líderes y gestores, así que sin permiso no se muestra la "×".
   final void Function(Tarea tarea)? onDelete;
-  final void Function(Tarea tarea, int? asignadoAId) onAssign;
+  final void Function(
+    Tarea tarea, {
+    required String titulo,
+    required String descripcion,
+    required int? asignadoAId,
+    required List<TareaEspera> esperando,
+  }) onUpdate;
   final List<AssignableUser> usuarios;
 
   static const _kColumns = [
@@ -206,105 +217,65 @@ class _KanbanBoardState extends State<KanbanBoard> {
           accentColor: col.color,
           isDragging: false,
           onDelete: widget.onDelete == null ? null : () => widget.onDelete!(tarea),
-          onAssignTap: () => _showAssignDialog(tarea),
+          onEditTap: () => _showEditDialog(tarea),
         ),
       ),
     );
   }
 
-  Future<void> _showAssignDialog(Tarea tarea) async {
+  Future<void> _showEditDialog(Tarea tarea) async {
+    final titleCtrl = TextEditingController(text: tarea.titulo);
+    final descCtrl = TextEditingController(text: tarea.descripcion);
     int? selectedUserId = tarea.asignadoAId;
+    var esperando = List<TareaEspera>.from(tarea.esperando);
+    final usuarios = _usuariosForDropdown(selectedUserId, tarea.asignadoANombre);
 
     await showDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx2, setStateDialog) => AlertDialog(
-          title: const Text('Cambiar responsable'),
+          title: const Text('Editar tarea'),
           content: SizedBox(
-            width: 360,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  tarea.titulo,
-                  style: AppTypography.textTheme.bodyMedium?.copyWith(
-                    color: AppColors.slate500,
+            width: 400,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AppTextField(controller: titleCtrl, label: 'Título'),
+                  const SizedBox(height: 14),
+                  AppTextField(
+                    controller: descCtrl,
+                    label: 'Descripción',
+                    minLines: 2,
+                    maxLines: 5,
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 14),
-                DropdownButtonFormField<int?>(
-                  initialValue: selectedUserId,
-                  decoration: const InputDecoration(
-                    labelText: 'Asignado a',
-                    prefixIcon: Icon(Icons.person_outline),
-                  ),
-                  items: [
-                    const DropdownMenuItem<int?>(value: null, child: Text('Sin asignar')),
-                    for (final u in widget.usuarios)
-                      DropdownMenuItem<int?>(value: u.id, child: Text(u.fullName)),
-                  ],
-                  onChanged: (v) => setStateDialog(() => selectedUserId = v),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                if (selectedUserId != tarea.asignadoAId) {
-                  widget.onAssign(tarea, selectedUserId);
-                }
-              },
-              child: const Text('Guardar'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _showCreateDialog(String estado) async {
-    final titleCtrl = TextEditingController();
-    int? selectedUserId;
-
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx2, setStateDialog) => AlertDialog(
-          title: const Text('Nueva tarea'),
-          content: SizedBox(
-            width: 360,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AppTextField(controller: titleCtrl, label: 'Título de la tarea'),
-                if (widget.usuarios.isNotEmpty) ...[
                   const SizedBox(height: 14),
                   DropdownButtonFormField<int?>(
                     initialValue: selectedUserId,
+                    isExpanded: true,
                     decoration: const InputDecoration(
-                      labelText: 'Asignar a (opcional)',
+                      labelText: 'Asignado a',
                       prefixIcon: Icon(Icons.person_outline),
                     ),
                     items: [
                       const DropdownMenuItem<int?>(value: null, child: Text('Sin asignar')),
-                      for (final u in widget.usuarios)
-                        DropdownMenuItem<int?>(value: u.id, child: Text(u.fullName)),
+                      for (final u in usuarios)
+                        DropdownMenuItem<int?>(
+                          value: u.id,
+                          child: Text(u.fullName, overflow: TextOverflow.ellipsis),
+                        ),
                     ],
                     onChanged: (v) => setStateDialog(() => selectedUserId = v),
                   ),
+                  const SizedBox(height: 16),
+                  _EsperandoField(
+                    usuarios: usuarios,
+                    value: esperando,
+                    onChanged: (next) => setStateDialog(() => esperando = next),
+                  ),
                 ],
-              ],
+              ),
             ),
           ),
           actions: [
@@ -317,7 +288,103 @@ class _KanbanBoardState extends State<KanbanBoard> {
                 final titulo = titleCtrl.text.trim();
                 if (titulo.isEmpty) return;
                 Navigator.of(ctx).pop();
-                widget.onCreate(titulo, estado, selectedUserId);
+                widget.onUpdate(
+                  tarea,
+                  titulo: titulo,
+                  descripcion: descCtrl.text.trim(),
+                  asignadoAId: selectedUserId,
+                  esperando: esperando,
+                );
+              },
+              child: const Text('Guardar'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    titleCtrl.dispose();
+    descCtrl.dispose();
+  }
+
+  List<AssignableUser> _usuariosForDropdown(int? selectedId, String? selectedName) {
+    final seen = <int>{};
+    final list = <AssignableUser>[];
+    for (final u in widget.usuarios) {
+      if (seen.add(u.id)) list.add(u);
+    }
+    if (selectedId != null && !seen.contains(selectedId)) {
+      list.insert(
+        0,
+        AssignableUser(
+          id: selectedId,
+          fullName: selectedName ?? 'Usuario #$selectedId',
+        ),
+      );
+    }
+    return list;
+  }
+
+  Future<void> _showCreateDialog(String estado) async {
+    final titleCtrl = TextEditingController();
+    int? selectedUserId;
+    var esperando = <TareaEspera>[];
+    final usuarios = _usuariosForDropdown(null, null);
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx2, setStateDialog) => AlertDialog(
+          title: const Text('Nueva tarea'),
+          content: SizedBox(
+            width: 400,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AppTextField(controller: titleCtrl, label: 'Título de la tarea'),
+                  if (usuarios.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    DropdownButtonFormField<int?>(
+                      initialValue: selectedUserId,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Asignar a (opcional)',
+                        prefixIcon: Icon(Icons.person_outline),
+                      ),
+                      items: [
+                        const DropdownMenuItem<int?>(value: null, child: Text('Sin asignar')),
+                        for (final u in usuarios)
+                          DropdownMenuItem<int?>(
+                            value: u.id,
+                            child: Text(u.fullName, overflow: TextOverflow.ellipsis),
+                          ),
+                      ],
+                      onChanged: (v) => setStateDialog(() => selectedUserId = v),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  _EsperandoField(
+                    usuarios: usuarios,
+                    value: esperando,
+                    onChanged: (next) => setStateDialog(() => esperando = next),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final titulo = titleCtrl.text.trim();
+                if (titulo.isEmpty) return;
+                Navigator.of(ctx).pop();
+                widget.onCreate(titulo, estado, selectedUserId, esperando);
               },
               child: const Text('Crear'),
             ),
@@ -337,14 +404,14 @@ class _TareaCardContent extends StatelessWidget {
     required this.accentColor,
     required this.isDragging,
     this.onDelete,
-    this.onAssignTap,
+    this.onEditTap,
   });
 
   final Tarea tarea;
   final Color accentColor;
   final bool isDragging;
   final VoidCallback? onDelete;
-  final VoidCallback? onAssignTap;
+  final VoidCallback? onEditTap;
 
   @override
   Widget build(BuildContext context) {
@@ -364,12 +431,12 @@ class _TareaCardContent extends StatelessWidget {
             : null,
       ),
       padding: const EdgeInsets.fromLTRB(12, 10, 6, 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
           Container(
             width: 3,
-            height: 36,
             margin: const EdgeInsets.only(right: 10),
             decoration: BoxDecoration(
               color: accentColor,
@@ -383,13 +450,21 @@ class _TareaCardContent extends StatelessWidget {
                 Text(
                   tarea.titulo,
                   style: AppTypography.textTheme.titleSmall?.copyWith(fontSize: 13),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
+                if (tarea.descripcion.trim().isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    tarea.descripcion,
+                    style: AppTypography.textTheme.bodySmall?.copyWith(
+                      color: AppColors.slate500,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 6),
-                if (!isDragging && onAssignTap != null)
+                if (!isDragging && onEditTap != null)
                   InkWell(
-                    onTap: onAssignTap,
+                    onTap: onEditTap,
                     borderRadius: BorderRadius.circular(6),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 2),
@@ -413,7 +488,7 @@ class _TareaCardContent extends StatelessWidget {
                             Icon(Icons.person_add_alt_1_outlined, size: 14, color: AppColors.brand600),
                             const SizedBox(width: 4),
                             Text(
-                              'Asignar',
+                              'Editar',
                               style: AppTypography.textTheme.bodySmall?.copyWith(
                                 color: AppColors.brand600,
                                 fontSize: 11,
@@ -445,6 +520,73 @@ class _TareaCardContent extends StatelessWidget {
                       ),
                     ],
                   ),
+                if (tarea.esperando.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.warningSoft,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.warning.withValues(alpha: 0.28)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.hourglass_top_rounded, size: 13, color: AppColors.warning),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Esperando',
+                              style: AppTypography.textTheme.labelSmall?.copyWith(
+                                color: AppColors.warning,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Wrap(
+                          spacing: 4,
+                          runSpacing: 4,
+                          children: [
+                            for (final p in tarea.esperando)
+                              Container(
+                                padding: const EdgeInsets.fromLTRB(7, 4, 7, 5),
+                                decoration: BoxDecoration(
+                                  color: AppColors.white,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: AppColors.warning.withValues(alpha: 0.35)),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      p.esExterno ? '${p.nombre} (ext.)' : p.nombre,
+                                      style: AppTypography.textTheme.labelSmall?.copyWith(
+                                        color: AppColors.slate700,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    if (p.detalle.isNotEmpty)
+                                      Text(
+                                        p.detalle,
+                                        style: AppTypography.textTheme.labelSmall?.copyWith(
+                                          color: AppColors.slate500,
+                                          fontSize: 10,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -456,8 +598,168 @@ class _TareaCardContent extends StatelessWidget {
                 child: Icon(Icons.close, size: 14, color: AppColors.slate300),
               ),
             ),
-        ],
+          ],
+        ),
       ),
+    );
+  }
+}
+
+class _EsperandoField extends StatefulWidget {
+  const _EsperandoField({
+    required this.value,
+    required this.onChanged,
+    required this.usuarios,
+  });
+
+  final List<TareaEspera> value;
+  final ValueChanged<List<TareaEspera>> onChanged;
+  final List<AssignableUser> usuarios;
+
+  @override
+  State<_EsperandoField> createState() => _EsperandoFieldState();
+}
+
+class _EsperandoFieldState extends State<_EsperandoField> {
+  final _nombreLibre = TextEditingController();
+  final _detalle = TextEditingController();
+
+  @override
+  void dispose() {
+    _nombreLibre.dispose();
+    _detalle.dispose();
+    super.dispose();
+  }
+
+  bool _yaEsta(String nombre) {
+    final key = nombre.trim().toLowerCase();
+    return widget.value.any((e) => e.nombre.toLowerCase() == key);
+  }
+
+  void _add({required String nombre, int? usuarioId}) {
+    final n = nombre.trim();
+    if (n.isEmpty || _yaEsta(n)) return;
+    widget.onChanged([
+      ...widget.value,
+      TareaEspera(nombre: n, usuarioId: usuarioId, detalle: _detalle.text.trim()),
+    ]);
+    _nombreLibre.clear();
+    _detalle.clear();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final value = widget.value;
+    final usuarios = widget.usuarios;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Esperando a', style: AppTypography.textTheme.labelMedium),
+        const SizedBox(height: 4),
+        Text(
+          'Quién y qué necesitas para seguir (sin límite de personas).',
+          style: AppTypography.textTheme.bodySmall?.copyWith(color: AppColors.slate500),
+        ),
+        const SizedBox(height: 8),
+        if (value.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Column(
+              children: [
+                for (var i = 0; i < value.length; i++)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: InputChip(
+                      isEnabled: true,
+                      label: SizedBox(
+                        width: 280,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              value[i].esExterno ? '${value[i].nombre} (ext.)' : value[i].nombre,
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                            ),
+                            if (value[i].detalle.isNotEmpty)
+                              Text(
+                                value[i].detalle,
+                                style: TextStyle(fontSize: 11, color: AppColors.slate500),
+                              ),
+                          ],
+                        ),
+                      ),
+                      onDeleted: () {
+                        final next = List<TareaEspera>.from(value)..removeAt(i);
+                        widget.onChanged(next);
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        AppTextField(
+          controller: _detalle,
+          label: 'Qué necesito',
+          hint: 'Ej. revisar el script, confirmar stock…',
+          minLines: 1,
+          maxLines: 3,
+        ),
+        const SizedBox(height: 10),
+        if (usuarios.isNotEmpty)
+          DropdownButtonFormField<int?>(
+            key: ValueKey(value.map((e) => e.nombre).join('|')),
+            initialValue: null,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: 'Agregar del sistema',
+              prefixIcon: Icon(Icons.group_add_outlined),
+            ),
+            items: [
+              const DropdownMenuItem<int?>(value: null, child: Text('Elegir persona…')),
+              for (final u in usuarios)
+                if (!_yaEsta(u.fullName))
+                  DropdownMenuItem<int?>(
+                    value: u.id,
+                    child: Text(u.fullName, overflow: TextOverflow.ellipsis),
+                  ),
+            ],
+            onChanged: (id) {
+              if (id == null) return;
+              AssignableUser? u;
+              for (final x in usuarios) {
+                if (x.id == id) {
+                  u = x;
+                  break;
+                }
+              }
+              if (u == null) return;
+              _add(nombre: u.fullName, usuarioId: u.id);
+            },
+          ),
+        const SizedBox(height: 10),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: AppTextField(
+                controller: _nombreLibre,
+                label: 'Nombre libre',
+                hint: 'Quien no está en el sistema',
+                onSubmitted: (_) => _add(nombre: _nombreLibre.text),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 2),
+              child: IconButton.filled(
+                tooltip: 'Agregar',
+                onPressed: () => _add(nombre: _nombreLibre.text),
+                icon: const Icon(Icons.add, size: 20),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

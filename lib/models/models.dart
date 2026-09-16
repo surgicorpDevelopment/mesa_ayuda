@@ -286,6 +286,70 @@ class InboxStats {
       );
 }
 
+/// Persona de la que depende una tarea (usuario del sistema o nombre libre).
+class TareaEspera {
+  final String nombre;
+  final int? usuarioId;
+  final String detalle;
+
+  const TareaEspera({
+    required this.nombre,
+    this.usuarioId,
+    this.detalle = '',
+  });
+
+  bool get esExterno => usuarioId == null;
+
+  factory TareaEspera.fromJson(Map<String, dynamic> json) {
+    final rawId = json['usuario_id'];
+    int? usuarioId;
+    if (rawId is int) {
+      usuarioId = rawId;
+    } else if (rawId != null) {
+      usuarioId = int.tryParse('$rawId');
+    }
+    return TareaEspera(
+      nombre: (json['nombre'] ?? '').toString().trim(),
+      usuarioId: usuarioId,
+      detalle: (json['detalle'] ?? '').toString().trim(),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'nombre': nombre,
+        'usuario_id': usuarioId,
+        'detalle': detalle,
+      };
+}
+
+List<TareaEspera> parseEsperando(dynamic raw) {
+  if (raw is! List) return const [];
+  final out = <TareaEspera>[];
+  final seen = <String>{};
+  for (final item in raw) {
+    Map<String, dynamic>? map;
+    if (item is TareaEspera) {
+      if (item.nombre.isEmpty) continue;
+      final key = item.nombre.toLowerCase();
+      if (!seen.add(key)) continue;
+      out.add(item);
+      continue;
+    }
+    if (item is Map<String, dynamic>) {
+      map = item;
+    } else if (item is Map) {
+      map = Map<String, dynamic>.from(item);
+    }
+    if (map == null) continue;
+    final parsed = TareaEspera.fromJson(map);
+    if (parsed.nombre.isEmpty) continue;
+    final key = parsed.nombre.toLowerCase();
+    if (!seen.add(key)) continue;
+    out.add(parsed);
+  }
+  return out;
+}
+
 /// Tarea de avance dentro de un proyecto (tablero Kanban).
 ///
 /// Estados: pendiente | en_progreso | hecho
@@ -297,6 +361,7 @@ class Tarea {
   final int? asignadoAId;
   final String? asignadoANombre;
   final int proyectoId;
+  final List<TareaEspera> esperando;
   final DateTime? fechaCreacion;
   final DateTime? fechaActualizacion;
 
@@ -308,6 +373,7 @@ class Tarea {
     this.asignadoAId,
     this.asignadoANombre,
     required this.proyectoId,
+    this.esperando = const [],
     this.fechaCreacion,
     this.fechaActualizacion,
   });
@@ -320,6 +386,7 @@ class Tarea {
         asignadoAId: json['asignado_a'] as int?,
         asignadoANombre: json['asignado_a_nombre'] as String?,
         proyectoId: json['proyecto'] as int,
+        esperando: parseEsperando(json['esperando']),
         fechaCreacion: json['created_at'] != null
             ? DateTime.tryParse(json['created_at'] as String)
             : null,
@@ -334,6 +401,7 @@ class Tarea {
         'estado': estado,
         'asignado_a': asignadoAId,
         'proyecto': proyectoId,
+        'esperando': esperando.map((e) => e.toJson()).toList(),
       };
 }
 
