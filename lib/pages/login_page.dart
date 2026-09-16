@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../providers/auth_provider.dart';
 import '../theme/app_colors.dart';
@@ -17,10 +18,44 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
+  static const _kRemember = 'gp_remember';
+  static const _kRememberUser = 'gp_remember_user';
+  static const _kRememberPass = 'gp_remember_pass';
+
   final _userCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   bool _obscure = true;
   bool _remember = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRemembered();
+  }
+
+  Future<void> _loadRemembered() async {
+    final prefs = await SharedPreferences.getInstance();
+    final remember = prefs.getBool(_kRemember) ?? false;
+    if (!remember || !mounted) return;
+    setState(() {
+      _remember = true;
+      _userCtrl.text = prefs.getString(_kRememberUser) ?? '';
+      _passCtrl.text = prefs.getString(_kRememberPass) ?? '';
+    });
+  }
+
+  Future<void> _persistRemembered() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (_remember) {
+      await prefs.setBool(_kRemember, true);
+      await prefs.setString(_kRememberUser, _userCtrl.text.trim());
+      await prefs.setString(_kRememberPass, _passCtrl.text);
+    } else {
+      await prefs.remove(_kRemember);
+      await prefs.remove(_kRememberUser);
+      await prefs.remove(_kRememberPass);
+    }
+  }
 
   @override
   void dispose() {
@@ -33,7 +68,10 @@ class _LoginPageState extends State<LoginPage> {
     final auth = context.read<AuthProvider>();
     final ok = await auth.login(_userCtrl.text, _passCtrl.text);
     if (!mounted) return;
-    if (ok) context.go('/');
+    if (!ok) return;
+    await _persistRemembered();
+    if (!mounted) return;
+    context.go('/');
   }
 
   @override
@@ -131,7 +169,9 @@ class _LoginPageState extends State<LoginPage> {
                         onSubmitted: (_) => _submit(),
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                            _obscure
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
                             size: 20,
                             color: AppColors.slate500,
                           ),
@@ -148,7 +188,8 @@ class _LoginPageState extends State<LoginPage> {
                             style: AppTypography.textTheme.bodyMedium,
                           ),
                           value: _remember,
-                          onChanged: (v) => setState(() => _remember = v ?? true),
+                          onChanged: (v) =>
+                              setState(() => _remember = v ?? true),
                           controlAffinity: ListTileControlAffinity.leading,
                           activeColor: AppColors.brand600,
                         ),
@@ -160,18 +201,23 @@ class _LoginPageState extends State<LoginPage> {
                           decoration: BoxDecoration(
                             color: AppColors.dangerSoft,
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: AppColors.danger.withValues(alpha: 0.2)),
+                            border: Border.all(
+                              color: AppColors.danger.withValues(alpha: 0.2),
+                            ),
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.error_outline, size: 18, color: AppColors.danger),
+                              const Icon(
+                                Icons.error_outline,
+                                size: 18,
+                                color: AppColors.danger,
+                              ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   auth.error!,
-                                  style: AppTypography.textTheme.bodySmall?.copyWith(
-                                    color: AppColors.danger,
-                                  ),
+                                  style: AppTypography.textTheme.bodySmall
+                                      ?.copyWith(color: AppColors.danger),
                                 ),
                               ),
                             ],

@@ -170,7 +170,8 @@ class ApiClient {
         email: currentUser!.email,
         groups: currentUser!.groups,
         area: currentUser!.area ?? areaFromId ?? first['area'] as String?,
-        areaId: currentUser!.areaId ??
+        areaId:
+            currentUser!.areaId ??
             (areaId is Map ? areaId['id'] as int? : areaId as int?),
         puesto: puesto,
         isStaff: currentUser!.isStaff,
@@ -525,8 +526,9 @@ class ApiClient {
         headers: _authHeaders(json: false),
       ),
     );
-    if (res.statusCode >= 400)
+    if (res.statusCode >= 400) {
       throw ApiException(res.statusCode, _errorMessage(res));
+    }
   }
 
   /// Sube un adjunto al ticket. Devuelve el ticket actualizado.
@@ -560,8 +562,9 @@ class ApiClient {
     final streamed = await _send(
       () async => http.Response.fromStream(await request.send()),
     );
-    if (streamed.statusCode >= 400)
+    if (streamed.statusCode >= 400) {
       throw ApiException(streamed.statusCode, _errorMessage(streamed));
+    }
     // Recargar el ticket completo para tener la lista de adjuntos actualizada
     final data = await _get('${ApiConfig.ticketsPath}$ticketId/');
     return Ticket.fromJson(data);
@@ -582,8 +585,9 @@ class ApiClient {
         headers: _authHeaders(json: false),
       ),
     );
-    if (res.statusCode >= 400)
+    if (res.statusCode >= 400) {
       throw ApiException(res.statusCode, _errorMessage(res));
+    }
     final data = await _get('${ApiConfig.ticketsPath}$ticketId/');
     return Ticket.fromJson(data);
   }
@@ -680,8 +684,9 @@ class ApiClient {
     final streamed = await _send(
       () async => http.Response.fromStream(await request.send()),
     );
-    if (streamed.statusCode >= 400)
+    if (streamed.statusCode >= 400) {
       throw ApiException(streamed.statusCode, _errorMessage(streamed));
+    }
     final data = await _get('${ApiConfig.proyectosPath}$proyectoId/');
     return Proyecto.fromJson(data);
   }
@@ -704,8 +709,9 @@ class ApiClient {
         headers: _authHeaders(json: false),
       ),
     );
-    if (res.statusCode >= 400)
+    if (res.statusCode >= 400) {
       throw ApiException(res.statusCode, _errorMessage(res));
+    }
     final data = await _get('${ApiConfig.proyectosPath}$proyectoId/');
     return Proyecto.fromJson(data);
   }
@@ -787,8 +793,9 @@ class ApiClient {
         headers: _authHeaders(json: false),
       ),
     );
-    if (res.statusCode >= 400)
+    if (res.statusCode >= 400) {
       throw ApiException(res.statusCode, _errorMessage(res));
+    }
   }
 
   Future<List<Comentario>> fetchComentarios(String tipo, int refId) async {
@@ -907,8 +914,9 @@ class ApiClient {
         headers: _authHeaders(json: false),
       ),
     );
-    if (res.statusCode >= 400)
+    if (res.statusCode >= 400) {
       throw ApiException(res.statusCode, _errorMessage(res));
+    }
   }
 
   Future<ProductividadReport> fetchProductividad({
