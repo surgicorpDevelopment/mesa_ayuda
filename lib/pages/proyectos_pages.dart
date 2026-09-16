@@ -445,10 +445,7 @@ class _ProyectoFormPageState extends State<ProyectoFormPage> {
                           for (final u in _responsables)
                             DropdownMenuItem<int?>(
                               value: u.id,
-                              child: Text(
-                                u.rol != null ? '${u.fullName} · ${u.rol}' : u.fullName,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                              child: Text(u.fullName, overflow: TextOverflow.ellipsis),
                             ),
                         ],
                         onChanged: (v) => setState(() => _responsableId = v),
@@ -500,6 +497,7 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
   Proyecto? _proyecto;
   List<Tarea> _tareas = [];
   List<AssignableUser> _usuarios = [];
+  List<AreaOption> _areas = [];
   List<HistorialEstado> _historial = [];
   bool _loading = true;
   String? _error;
@@ -507,6 +505,7 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
   bool _loadingHistorial = false;
   bool _deleting = false;
   bool _savingTexto = false;
+  bool _editingTexto = false;
 
   final _titulo = TextEditingController();
   final _desc = TextEditingController();
@@ -517,8 +516,6 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _titulo.addListener(() => setState(() {}));
-    _desc.addListener(() => setState(() {}));
     _load();
   }
 
@@ -531,15 +528,8 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
   }
 
   void _syncTextoFromProyecto(Proyecto p) {
-    if (_titulo.text != p.titulo) _titulo.text = p.titulo;
-    if (_desc.text != p.descripcion) _desc.text = p.descripcion;
-  }
-
-  bool get _textoDirty {
-    final p = _proyecto;
-    if (p == null) return false;
-    return _titulo.text.trim() != p.titulo.trim() ||
-        _desc.text.trim() != p.descripcion.trim();
+    _titulo.text = p.titulo;
+    _desc.text = p.descripcion;
   }
 
   Future<void> _load() async {
@@ -549,18 +539,23 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
     });
     try {
       final api = context.read<AuthProvider>().api;
-      final results = await Future.wait([
+      final canManage = context.read<AuthProvider>().user?.canManageProyectos == true;
+      final futures = <Future>[
         api.fetchProyecto(widget.id),
         api.fetchTareas(proyectoId: widget.id),
         api.fetchAssignableUsers(),
-      ]);
+      ];
+      if (canManage) futures.add(api.fetchAreas());
+      final results = await Future.wait(futures);
       if (mounted) {
         final p = results[0] as Proyecto;
         setState(() {
           _proyecto = p;
           _tareas = results[1] as List<Tarea>;
           _usuarios = results[2] as List<AssignableUser>;
+          if (results.length > 3) _areas = results[3] as List<AreaOption>;
           _loading = false;
+          _editingTexto = false;
         });
         _syncTextoFromProyecto(p);
         _loadHistorial();
@@ -629,6 +624,31 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
     }
   }
 
+  Future<void> _setArea(int? areaId) async {
+    try {
+      final p = await context.read<AuthProvider>().api.updateProyecto(widget.id, {
+        'area_id': areaId,
+      });
+      if (mounted) setState(() => _proyecto = p);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
+  void _startEditTexto() {
+    final p = _proyecto;
+    if (p == null) return;
+    _syncTextoFromProyecto(p);
+    setState(() => _editingTexto = true);
+  }
+
+  void _cancelEditTexto() {
+    final p = _proyecto;
+    if (p != null) _syncTextoFromProyecto(p);
+    setState(() => _editingTexto = false);
+  }
+
   Future<void> _saveTexto() async {
     final titulo = _titulo.text.trim();
     if (titulo.isEmpty) {
@@ -644,7 +664,10 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
         'descripcion': _desc.text.trim(),
       });
       if (!mounted) return;
-      setState(() => _proyecto = p);
+      setState(() {
+        _proyecto = p;
+        _editingTexto = false;
+      });
       _syncTextoFromProyecto(p);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Proyecto actualizado')),
@@ -846,24 +869,42 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
 
     return Scaffold(
       backgroundColor: AppColors.bg,
-      appBar: AppBar(
-        title: Text(_proyecto?.titulo ?? 'Proyecto #${widget.id}'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/proyectos'),
-        ),
-        bottom: _loading || _error != null
-            ? null
-            : TabBar(
-                controller: _tabController,
-                labelColor: AppColors.white,
-                unselectedLabelColor: AppColors.slate300,
-                indicatorColor: AppColors.white,
-                tabs: [
-                  const Tab(text: 'Detalle'),
-                  Tab(text: 'Tareas (${_tareas.length})'),
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(48),
+        child: Material(
+          color: AppColors.brand600,
+          child: SafeArea(
+            bottom: false,
+            child: SizedBox(
+              height: 48,
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, color: AppColors.white),
+                    onPressed: () => context.go('/proyectos'),
+                    tooltip: 'Volver',
+                  ),
+                  if (!_loading && _error == null)
+                    Expanded(
+                      child: TabBar(
+                        controller: _tabController,
+                        labelColor: AppColors.white,
+                        unselectedLabelColor: AppColors.slate300,
+                        indicatorColor: AppColors.white,
+                        indicatorSize: TabBarIndicatorSize.label,
+                        dividerColor: Colors.transparent,
+                        dividerHeight: 0,
+                        tabs: [
+                          const Tab(text: 'Detalle', height: 40),
+                          Tab(text: 'Tareas (${_tareas.length})', height: 40),
+                        ],
+                      ),
+                    ),
                 ],
               ),
+            ),
+          ),
+        ),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
@@ -904,7 +945,7 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
                 ],
               ),
               const SizedBox(height: 14),
-              if (canManage) ...[
+              if (_editingTexto && canManage) ...[
                 AppTextField(controller: _titulo, label: 'Título'),
                 const SizedBox(height: 14),
                 AppTextField(
@@ -913,26 +954,71 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
                   minLines: 4,
                   maxLines: 10,
                 ),
-                if (_textoDirty) ...[
-                  const SizedBox(height: 12),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: AppButton(
-                      label: 'Guardar cambios',
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    AppButton(
+                      label: 'Cancelar',
+                      variant: AppButtonVariant.ghost,
+                      onPressed: _savingTexto ? null : _cancelEditTexto,
+                    ),
+                    const Spacer(),
+                    AppButton(
+                      label: 'Guardar',
                       loading: _savingTexto,
                       onPressed: _savingTexto ? null : _saveTexto,
                     ),
-                  ),
-                ],
-              ] else
+                  ],
+                ),
+              ] else ...[
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        p.titulo,
+                        style: AppTypography.textTheme.titleLarge,
+                      ),
+                    ),
+                    if (canManage)
+                      IconButton(
+                        tooltip: 'Editar título y descripción',
+                        onPressed: _startEditTexto,
+                        icon: const Icon(Icons.edit_outlined, size: 20),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
                 Text(
                   p.descripcion.isEmpty ? 'Sin descripción' : p.descripcion,
                   style: AppTypography.textTheme.bodyLarge,
                 ),
-              const SizedBox(height: 12),
-              if (canManage)
+              ],
+              const SizedBox(height: 16),
+              if (canManage) ...[
                 DropdownButtonFormField<int?>(
-                  key: ValueKey(p.responsableId),
+                  key: ValueKey('area-${p.areaId}'),
+                  initialValue: p.areaId,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Área',
+                    prefixIcon: Icon(Icons.business_outlined),
+                  ),
+                  items: [
+                    const DropdownMenuItem<int?>(value: null, child: Text('Sin área')),
+                    for (final a in _areas)
+                      DropdownMenuItem<int?>(value: a.id, child: Text(a.nombre)),
+                    if (p.areaId != null && !_areas.any((a) => a.id == p.areaId))
+                      DropdownMenuItem<int?>(
+                        value: p.areaId,
+                        child: Text(p.areaNombre ?? 'Área #${p.areaId}'),
+                      ),
+                  ],
+                  onChanged: _setArea,
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<int?>(
+                  key: ValueKey('resp-${p.responsableId}'),
                   initialValue: p.responsableId,
                   isExpanded: true,
                   decoration: const InputDecoration(
@@ -947,15 +1033,26 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
                     for (final u in _dropdownResponsables)
                       DropdownMenuItem<int?>(
                         value: u.id,
-                        child: Text(
-                          u.rol != null ? '${u.fullName} · ${u.rol}' : u.fullName,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                        child: Text(u.fullName, overflow: TextOverflow.ellipsis),
                       ),
                   ],
                   onChanged: _setResponsable,
-                )
-              else
+                ),
+              ] else ...[
+                if (p.areaNombre != null && p.areaNombre!.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        Icon(Icons.business_outlined, size: 16, color: AppColors.slate500),
+                        const SizedBox(width: 6),
+                        Text(
+                          p.areaNombre!,
+                          style: AppTypography.textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
                 Row(
                   children: [
                     AppAvatar(name: p.responsableNombre ?? '—', size: 30),
@@ -966,6 +1063,7 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
                     ),
                   ],
                 ),
+              ],
               const SizedBox(height: 16),
               if (canManage)
                 Row(
@@ -1020,19 +1118,6 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
                   ],
                 ),
               ],
-              if (canDelete) ...[
-                const SizedBox(height: 20),
-                const Divider(),
-                const SizedBox(height: 12),
-                AppButton(
-                  label: 'Eliminar proyecto',
-                  icon: Icons.delete_outline,
-                  variant: AppButtonVariant.danger,
-                  expanded: true,
-                  loading: _deleting,
-                  onPressed: _deleting ? null : _confirmDelete,
-                ),
-              ],
             ],
           ),
         ),
@@ -1052,6 +1137,17 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
             loading: _loadingHistorial,
           ),
         ),
+        if (canDelete) ...[
+          const SizedBox(height: 16),
+          AppButton(
+            label: 'Eliminar proyecto',
+            icon: Icons.delete_outline,
+            variant: AppButtonVariant.danger,
+            expanded: true,
+            loading: _deleting,
+            onPressed: _deleting ? null : _confirmDelete,
+          ),
+        ],
       ],
     );
   }

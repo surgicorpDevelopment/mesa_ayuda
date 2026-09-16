@@ -146,18 +146,32 @@ class _TicketsListPageState extends State<TicketsListPage> {
                         selected: !widget.onlyAssignedToMe && !widget.onlyUnassigned,
                         onSelected: (_) => context.go('/tickets'),
                         selectedColor: AppColors.brand50,
+                        checkmarkColor: AppColors.brand600,
+                        labelStyle: AppTypography.textTheme.labelMedium?.copyWith(
+                          color: !widget.onlyAssignedToMe && !widget.onlyUnassigned
+                              ? AppColors.brand600
+                              : AppColors.slate700,
+                        ),
                       ),
                       FilterChip(
                         label: Text('Asignados a mí ($_countMine)'),
                         selected: widget.onlyAssignedToMe,
                         onSelected: (_) => context.go('/tickets?mine=1'),
                         selectedColor: AppColors.brand50,
+                        checkmarkColor: AppColors.brand600,
+                        labelStyle: AppTypography.textTheme.labelMedium?.copyWith(
+                          color: widget.onlyAssignedToMe ? AppColors.brand600 : AppColors.slate700,
+                        ),
                       ),
                       FilterChip(
                         label: Text('Sin asignar ($_countUnassigned)'),
                         selected: widget.onlyUnassigned,
                         onSelected: (_) => context.go('/tickets?unassigned=1'),
                         selectedColor: AppColors.brand50,
+                        checkmarkColor: AppColors.brand600,
+                        labelStyle: AppTypography.textTheme.labelMedium?.copyWith(
+                          color: widget.onlyUnassigned ? AppColors.brand600 : AppColors.slate700,
+                        ),
                       ),
                     ],
                   ),
@@ -556,11 +570,28 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
   List<HistorialEstado> _historial = [];
   bool _loadingHistorial = false;
   bool _deleting = false;
+  bool _editingTexto = false;
+  bool _savingTexto = false;
+
+  final _titulo = TextEditingController();
+  final _desc = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _titulo.dispose();
+    _desc.dispose();
+    super.dispose();
+  }
+
+  void _syncTextoFromTicket(Ticket t) {
+    _titulo.text = t.titulo;
+    _desc.text = t.descripcion;
   }
 
   Future<void> _load() async {
@@ -575,7 +606,9 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
         setState(() {
           _ticket = t;
           _loading = false;
+          _editingTexto = false;
         });
+        _syncTextoFromTicket(t);
       }
       _loadAssignees();
       _loadHistorial();
@@ -696,6 +729,57 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
     }
   }
 
+  bool get _canEditTexto {
+    final user = context.read<AuthProvider>().user;
+    final t = _ticket;
+    if (user == null || t == null) return false;
+    return user.isDesarrollador || t.reportadoPorId == user.id;
+  }
+
+  void _startEditTexto() {
+    final t = _ticket;
+    if (t == null) return;
+    _syncTextoFromTicket(t);
+    setState(() => _editingTexto = true);
+  }
+
+  void _cancelEditTexto() {
+    final t = _ticket;
+    if (t != null) _syncTextoFromTicket(t);
+    setState(() => _editingTexto = false);
+  }
+
+  Future<void> _saveTexto() async {
+    final titulo = _titulo.text.trim();
+    if (titulo.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('El título no puede estar vacío.')),
+      );
+      return;
+    }
+    setState(() => _savingTexto = true);
+    try {
+      final t = await context.read<AuthProvider>().api.updateTicket(widget.id, {
+        'titulo': titulo,
+        'descripcion': _desc.text.trim(),
+      });
+      if (!mounted) return;
+      setState(() {
+        _ticket = t;
+        _editingTexto = false;
+      });
+      _syncTextoFromTicket(t);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ticket actualizado')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    } finally {
+      if (mounted) setState(() => _savingTexto = false);
+    }
+  }
+
   Future<void> _confirmDelete() async {
     final ok = await showDialog<bool>(
       context: context,
@@ -737,9 +821,26 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
 
     return Scaffold(
       backgroundColor: AppColors.bg,
-      appBar: AppBar(
-        title: Text(_ticket?.titulo ?? 'Ticket #${widget.id}'),
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.go('/tickets')),
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(48),
+        child: Material(
+          color: AppColors.brand600,
+          child: SafeArea(
+            bottom: false,
+            child: SizedBox(
+              height: 48,
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, color: AppColors.white),
+                    onPressed: () => context.go('/tickets'),
+                    tooltip: 'Volver',
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
@@ -747,6 +848,7 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
               ? AppEmptyState(message: _error!, icon: Icons.error_outline)
               : LayoutBuilder(
                   builder: (context, constraints) {
+                    final canEditTexto = _canEditTexto;
                     final main = [
                       AppCard(
                         child: Column(
@@ -768,10 +870,55 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
                               ],
                             ),
                             const SizedBox(height: 16),
-                            Text(
-                              _ticket!.descripcion.isEmpty ? 'Sin descripción' : _ticket!.descripcion,
-                              style: AppTypography.textTheme.bodyLarge,
-                            ),
+                            if (_editingTexto && canEditTexto) ...[
+                              AppTextField(controller: _titulo, label: 'Título'),
+                              const SizedBox(height: 14),
+                              AppTextField(
+                                controller: _desc,
+                                label: 'Descripción',
+                                minLines: 4,
+                                maxLines: 10,
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  AppButton(
+                                    label: 'Cancelar',
+                                    variant: AppButtonVariant.ghost,
+                                    onPressed: _savingTexto ? null : _cancelEditTexto,
+                                  ),
+                                  const Spacer(),
+                                  AppButton(
+                                    label: 'Guardar',
+                                    loading: _savingTexto,
+                                    onPressed: _savingTexto ? null : _saveTexto,
+                                  ),
+                                ],
+                              ),
+                            ] else ...[
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      _ticket!.titulo,
+                                      style: AppTypography.textTheme.titleLarge,
+                                    ),
+                                  ),
+                                  if (canEditTexto)
+                                    IconButton(
+                                      tooltip: 'Editar título y descripción',
+                                      onPressed: _startEditTexto,
+                                      icon: const Icon(Icons.edit_outlined, size: 20),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                _ticket!.descripcion.isEmpty ? 'Sin descripción' : _ticket!.descripcion,
+                                style: AppTypography.textTheme.bodyLarge,
+                              ),
+                            ],
                             const SizedBox(height: 16),
                             AttachmentGallery(
                               adjuntos: _ticket!.adjuntos,
@@ -803,6 +950,17 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
                           loading: _loadingHistorial,
                         ),
                       ),
+                      if (canDelete) ...[
+                        const SizedBox(height: 16),
+                        AppButton(
+                          label: 'Eliminar ticket',
+                          icon: Icons.delete_outline,
+                          variant: AppButtonVariant.danger,
+                          expanded: true,
+                          loading: _deleting,
+                          onPressed: _deleting ? null : _confirmDelete,
+                        ),
+                      ],
                     ];
 
                     final side = AppCard(
@@ -850,10 +1008,7 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
                                   for (final u in _dropdownUsers)
                                     DropdownMenuItem<int?>(
                                       value: u.id,
-                                      child: Text(
-                                        u.rol != null ? '${u.fullName} · ${u.rol}' : u.fullName,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
+                                      child: Text(u.fullName, overflow: TextOverflow.ellipsis),
                                     ),
                                 ],
                                 onChanged: (id) => _patch({'asignado_a': id}),
@@ -948,19 +1103,6 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
                             ),
                           ] else ...[
                             _DetailRow('Asignado a', _ticket!.asignadoANombre ?? 'Sin asignar'),
-                          ],
-                          if (canDelete) ...[
-                            const SizedBox(height: 20),
-                            const Divider(),
-                            const SizedBox(height: 12),
-                            AppButton(
-                              label: 'Eliminar ticket',
-                              icon: Icons.delete_outline,
-                              variant: AppButtonVariant.danger,
-                              expanded: true,
-                              loading: _deleting,
-                              onPressed: _deleting ? null : _confirmDelete,
-                            ),
                           ],
                         ],
                       ),
