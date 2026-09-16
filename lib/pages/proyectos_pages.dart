@@ -428,6 +428,7 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
   String? _error;
   bool _savingAdjunto = false;
   bool _loadingHistorial = false;
+  bool _deleting = false;
 
   late final TabController _tabController;
 
@@ -648,11 +649,46 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
     }
   }
 
+  Future<void> _confirmDelete() async {
+    final nTareas = _tareas.length;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Eliminar proyecto'),
+        content: Text(
+          '¿Eliminar "${_proyecto?.titulo ?? 'este proyecto'}"?\n'
+          '${nTareas > 0 ? 'También se borrarán $nTareas tarea(s). ' : ''}'
+          'Se borrarán comentarios, historial y adjuntos. No se puede deshacer.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _deleting = true);
+    try {
+      await context.read<AuthProvider>().api.deleteProyecto(widget.id);
+      if (!mounted) return;
+      context.go('/proyectos');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _deleting = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
   // ── Build ───────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     final canManage = context.watch<AuthProvider>().user?.canManageProyectos == true;
+    final canDelete = context.watch<AuthProvider>().user?.isLider == true;
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -682,14 +718,14 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
               : TabBarView(
                   controller: _tabController,
                   children: [
-                    _buildDetalleTab(canManage),
+                    _buildDetalleTab(canManage, canDelete),
                     _buildTareasTab(),
                   ],
                 ),
     );
   }
 
-  Widget _buildDetalleTab(bool canManage) {
+  Widget _buildDetalleTab(bool canManage, bool canDelete) {
     final p = _proyecto!;
     return ListView(
       padding: const EdgeInsets.all(24),
@@ -781,6 +817,19 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
                         onTap: () => _setEstado(e),
                       ),
                   ],
+                ),
+              ],
+              if (canDelete) ...[
+                const SizedBox(height: 20),
+                const Divider(),
+                const SizedBox(height: 12),
+                AppButton(
+                  label: 'Eliminar proyecto',
+                  icon: Icons.delete_outline,
+                  variant: AppButtonVariant.danger,
+                  expanded: true,
+                  loading: _deleting,
+                  onPressed: _deleting ? null : _confirmDelete,
                 ),
               ],
             ],

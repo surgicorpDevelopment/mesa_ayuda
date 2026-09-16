@@ -138,6 +138,26 @@ class GP_ProyectoViewSet(viewsets.ModelViewSet):
                 TipoEntidad.PROYECTO, obj.id, prev, obj.estado, self.request.user
             )
 
+    def perform_destroy(self, instance):
+        """Borra proyecto + comentarios/historial vinculados (tareas/adjuntos van por CASCADE)."""
+        tarea_ids = list(
+            GP_Tarea.objects.filter(proyecto=instance).values_list('id', flat=True)
+        )
+        GP_Comentario.objects.filter(
+            tipo=TipoEntidad.PROYECTO, ref_id=instance.id
+        ).delete()
+        GP_HistorialEstado.objects.filter(
+            tipo=TipoEntidad.PROYECTO, ref_id=instance.id
+        ).delete()
+        if tarea_ids:
+            GP_Comentario.objects.filter(
+                tipo=TipoEntidad.TAREA, ref_id__in=tarea_ids
+            ).delete()
+            GP_HistorialEstado.objects.filter(
+                tipo=TipoEntidad.TAREA, ref_id__in=tarea_ids
+            ).delete()
+        instance.delete()
+
     @action(
         detail=True,
         methods=['post'],
@@ -232,6 +252,15 @@ class GP_TicketViewSet(viewsets.ModelViewSet):
             _record_estado_change(
                 TipoEntidad.TICKET, obj.id, prev, obj.estado, user
             )
+
+    def perform_destroy(self, instance):
+        GP_Comentario.objects.filter(
+            tipo=TipoEntidad.TICKET, ref_id=instance.id
+        ).delete()
+        GP_HistorialEstado.objects.filter(
+            tipo=TipoEntidad.TICKET, ref_id=instance.id
+        ).delete()
+        instance.delete()
 
     @action(detail=False, methods=['get'])
     def inbox(self, request):

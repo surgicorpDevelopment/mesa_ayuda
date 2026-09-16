@@ -441,6 +441,26 @@ class ApiClient {
     return Ticket.fromJson(data);
   }
 
+  /// Elimina un ticket. En backend requiere líder/gestor (403 si no).
+  Future<void> deleteTicket(int id) async {
+    if (ApiConfig.useMock) {
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+      try {
+        _mock.deleteTicket(id);
+      } on StateError catch (e) {
+        throw ApiException(404, e.message);
+      }
+      return;
+    }
+    final res = await _send(
+      () => http.delete(
+        _uri('${ApiConfig.ticketsPath}$id/'),
+        headers: _authHeaders(json: false),
+      ),
+    );
+    if (res.statusCode >= 400) throw ApiException(res.statusCode, _errorMessage(res));
+  }
+
   /// Sube un adjunto al ticket. Devuelve el ticket actualizado.
   Future<Ticket> addAdjunto(int ticketId, TicketAdjunto adjunto) async {
     if (ApiConfig.useMock) {
@@ -662,6 +682,26 @@ class ApiClient {
     }
     final data = await _patch('${ApiConfig.proyectosPath}$id/', body);
     return Proyecto.fromJson(data);
+  }
+
+  /// Elimina un proyecto. En backend requiere líder/gestor (403 si no).
+  Future<void> deleteProyecto(int id) async {
+    if (ApiConfig.useMock) {
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+      try {
+        _mock.deleteProyecto(id);
+      } on StateError catch (e) {
+        throw ApiException(404, e.message);
+      }
+      return;
+    }
+    final res = await _send(
+      () => http.delete(
+        _uri('${ApiConfig.proyectosPath}$id/'),
+        headers: _authHeaders(json: false),
+      ),
+    );
+    if (res.statusCode >= 400) throw ApiException(res.statusCode, _errorMessage(res));
   }
 
   Future<List<Comentario>> fetchComentarios(String tipo, int refId) async {

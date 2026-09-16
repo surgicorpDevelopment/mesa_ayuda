@@ -65,6 +65,9 @@ Grupos: `gp_usuario`, `gp_desarrollador`, `gp_lider_area`, `gp_gestor_proyectos`
 **Tickets (helpdesk):** usuarios finales (`gp_usuario`) solo crean/ven los suyos.
 Desarrolladores+ ven cola global de abiertos sin asignar (`POST /GP_Ticket/{id}/tomar/`).
 **Proyectos y tareas:** solo desarrolladores, líderes y gestores.
+**Eliminar ticket o proyecto:** `DELETE /GP_Ticket/{id}/` y `DELETE /GP_Proyecto/{id}/`
+solo líderes/gestores (`gp_lider_area` / `gp_gestor_proyectos`). Borra también
+comentarios, historial y adjuntos; las tareas del proyecto van por CASCADE.
 **Comentarios e historial:** filtrados por la visibilidad de la entidad referida.
 
 Las reglas de visibilidad viven en un solo sitio, `GestionProyectos/scoping.py`

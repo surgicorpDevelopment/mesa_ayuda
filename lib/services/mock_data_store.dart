@@ -711,6 +711,14 @@ class MockDataStore {
     );
   }
 
+  void deleteTicket(int id) {
+    final existed = tickets.any((t) => t.id == id);
+    if (!existed) throw StateError('Ticket $id no encontrado');
+    tickets.removeWhere((t) => t.id == id);
+    comentarios.removeWhere((c) => c.tipo == 'ticket' && c.refId == id);
+    historial.removeWhere((e) => e.tipo == 'ticket' && e.refId == id);
+  }
+
   Ticket createTicket(Map<String, dynamic> body, {required int userId, required String userName}) {
     _ticketSeq += 1;
     final adjuntos = <TicketAdjunto>[];
@@ -998,6 +1006,49 @@ class MockDataStore {
       );
     }
     return updated;
+  }
+
+  void deleteProyecto(int id) {
+    final existed = proyectos.any((p) => p.id == id);
+    if (!existed) throw StateError('Proyecto $id no encontrado');
+    final tareaIds = tareas.where((t) => t.proyectoId == id).map((t) => t.id).toSet();
+    proyectos.removeWhere((p) => p.id == id);
+    tareas.removeWhere((t) => t.proyectoId == id);
+    // Tickets vinculados: se desvinculan (como SET_NULL en backend).
+    for (var i = 0; i < tickets.length; i++) {
+      final t = tickets[i];
+      if (t.proyectoId == id) {
+        tickets[i] = Ticket(
+          id: t.id,
+          titulo: t.titulo,
+          descripcion: t.descripcion,
+          areaId: t.areaId,
+          sistemaAfectado: t.sistemaAfectado,
+          estado: t.estado,
+          prioridad: t.prioridad,
+          impacto: t.impacto,
+          reportadoPorId: t.reportadoPorId,
+          reportadoPorNombre: t.reportadoPorNombre,
+          asignadoAId: t.asignadoAId,
+          asignadoANombre: t.asignadoANombre,
+          proyectoId: null,
+          proyectoTitulo: null,
+          fechaCreacion: t.fechaCreacion,
+          fechaActualizacion: t.fechaActualizacion,
+          adjuntos: t.adjuntos,
+        );
+      }
+    }
+    comentarios.removeWhere(
+      (c) =>
+          (c.tipo == 'proyecto' && c.refId == id) ||
+          (c.tipo == 'tarea' && tareaIds.contains(c.refId)),
+    );
+    historial.removeWhere(
+      (e) =>
+          (e.tipo == 'proyecto' && e.refId == id) ||
+          (e.tipo == 'tarea' && tareaIds.contains(e.refId)),
+    );
   }
 
   List<Comentario> listComentarios(String tipo, int refId) {

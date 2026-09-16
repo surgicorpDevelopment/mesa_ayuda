@@ -96,10 +96,15 @@ class CanManageTareas(BasePermission):
 
 
 class CanManageTickets(BasePermission):
-    """Cualquier autenticado puede crear/listar (queryset filtra). Escritura avanzada en object."""
+    """Cualquier autenticado puede crear/listar (queryset filtra).
+    DELETE solo líder/gestor (o superuser vía is_lider)."""
 
     def has_permission(self, request, view):
-        return bool(request.user and request.user.is_authenticated)
+        if not request.user or not request.user.is_authenticated:
+            return False
+        if request.method == 'DELETE':
+            return is_lider(request.user)
+        return True
 
 
 class CanManageSistemas(BasePermission):

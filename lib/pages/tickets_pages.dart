@@ -555,6 +555,7 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
   bool _savingAdjunto = false;
   List<HistorialEstado> _historial = [];
   bool _loadingHistorial = false;
+  bool _deleting = false;
 
   @override
   void initState() {
@@ -695,10 +696,43 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
     }
   }
 
+  Future<void> _confirmDelete() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Eliminar ticket'),
+        content: Text(
+          '¿Eliminar "${_ticket?.titulo ?? 'este ticket'}"?\n'
+          'Se borrarán comentarios, historial y adjuntos. No se puede deshacer.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _deleting = true);
+    try {
+      await context.read<AuthProvider>().api.deleteTicket(widget.id);
+      if (!mounted) return;
+      context.go('/tickets');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _deleting = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().user;
     final canManage = user?.isDesarrollador == true;
+    final canDelete = user?.isLider == true;
     final wide = MediaQuery.sizeOf(context).width >= 960;
 
     return Scaffold(
@@ -914,6 +948,19 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
                             ),
                           ] else ...[
                             _DetailRow('Asignado a', _ticket!.asignadoANombre ?? 'Sin asignar'),
+                          ],
+                          if (canDelete) ...[
+                            const SizedBox(height: 20),
+                            const Divider(),
+                            const SizedBox(height: 12),
+                            AppButton(
+                              label: 'Eliminar ticket',
+                              icon: Icons.delete_outline,
+                              variant: AppButtonVariant.danger,
+                              expanded: true,
+                              loading: _deleting,
+                              onPressed: _deleting ? null : _confirmDelete,
+                            ),
                           ],
                         ],
                       ),
