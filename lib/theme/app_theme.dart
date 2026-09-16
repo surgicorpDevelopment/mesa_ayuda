@@ -4,7 +4,7 @@ import 'app_colors.dart';
 import 'app_spacing.dart';
 import 'app_typography.dart';
 
-/// Tema Material 3 + tokens corporativos Surgicorp / picking.
+/// Tema Material 3 + identidad teal de Mesa de Ayuda.
 class AppTheme {
   // Compat con imports previos
   static const Color navy = AppColors.navy900;
@@ -16,7 +16,7 @@ class AppTheme {
 
   static ThemeData light() {
     final colorScheme = ColorScheme.light(
-      primary: AppColors.navy900,
+      primary: AppColors.brand600,
       onPrimary: AppColors.white,
       secondary: AppColors.accent,
       onSecondary: AppColors.white,
@@ -35,7 +35,7 @@ class AppTheme {
       textTheme: AppTypography.textTheme,
       fontFamily: AppTypography.fontFamily,
       appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.navy900,
+        backgroundColor: AppColors.brand600,
         foregroundColor: AppColors.white,
         elevation: 0,
         centerTitle: false,
@@ -76,7 +76,7 @@ class AppTheme {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.navy900,
+          backgroundColor: AppColors.brand600,
           foregroundColor: AppColors.white,
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
@@ -88,7 +88,7 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.navy900,
+          foregroundColor: AppColors.brand600,
           side: const BorderSide(color: AppColors.slate300),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           shape: RoundedRectangleBorder(
@@ -141,7 +141,7 @@ class AppTheme {
         }),
       ),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
-        backgroundColor: AppColors.navy900,
+        backgroundColor: AppColors.brand600,
         foregroundColor: AppColors.white,
         elevation: 2,
       ),
@@ -168,6 +168,29 @@ Color prioridadSoft(String p) {
       return AppColors.successSoft;
     default:
       return AppColors.warningSoft;
+  }
+}
+
+/// Colores de impacto (distintos de prioridad: púrpura / azul / slate).
+Color impactoColor(String p) {
+  switch (p) {
+    case 'alta':
+      return AppColors.purple;
+    case 'baja':
+      return AppColors.slate500;
+    default:
+      return AppColors.info;
+  }
+}
+
+Color impactoSoft(String p) {
+  switch (p) {
+    case 'alta':
+      return AppColors.purpleSoft;
+    case 'baja':
+      return AppColors.slate100;
+    default:
+      return AppColors.infoSoft;
   }
 }
 

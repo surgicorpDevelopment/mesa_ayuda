@@ -39,7 +39,7 @@ class AppButton extends StatelessWidget {
               strokeWidth: 2,
               color: variant == AppButtonVariant.primary || variant == AppButtonVariant.danger
                   ? AppColors.white
-                  : AppColors.navy900,
+                  : AppColors.brand600,
             ),
           )
         else if (icon != null) ...[
@@ -56,7 +56,7 @@ class AppButton extends StatelessWidget {
 
     final style = switch (variant) {
       AppButtonVariant.primary => ElevatedButton.styleFrom(
-          backgroundColor: AppColors.navy900,
+          backgroundColor: AppColors.brand600,
           foregroundColor: AppColors.white,
           disabledBackgroundColor: AppColors.slate200,
           elevation: 0,
@@ -67,7 +67,7 @@ class AppButton extends StatelessWidget {
           textStyle: AppTypography.textTheme.labelLarge?.copyWith(color: AppColors.white),
         ),
       AppButtonVariant.secondary => OutlinedButton.styleFrom(
-          foregroundColor: AppColors.navy900,
+          foregroundColor: AppColors.brand600,
           side: const BorderSide(color: AppColors.slate300),
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
           shape: RoundedRectangleBorder(

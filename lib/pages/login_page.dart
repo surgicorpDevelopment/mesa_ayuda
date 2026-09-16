@@ -47,7 +47,7 @@ class _LoginPageState extends State<LoginPage> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFFEAF3FB), Color(0xFFF7FAFC), Color(0xFFE8EEF5)],
+            colors: [Color(0xFFE6F7F5), Color(0xFFF7FAFC), Color(0xFFE8F0EE)],
           ),
         ),
         child: Center(
@@ -67,62 +67,43 @@ class _LoginPageState extends State<LoginPage> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Container(
-                        height: 64,
-                        decoration: BoxDecoration(
-                          color: AppColors.navy700,
-                          borderRadius: BorderRadius.circular(14),
-                        ),
+                      Align(
                         alignment: Alignment.center,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.asset(
-                                'assets/images/logo_surgi.png',
-                                width: 28,
-                                height: 28,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Container(
-                                  width: 28,
-                                  height: 28,
-                                  color: AppColors.accent,
-                                  alignment: Alignment.center,
-                                  child: const Text(
-                                    'S',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                ),
-                              ),
+                        child: Image.asset(
+                          'assets/images/logo_surgi_trim.png',
+                          height: 34,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => Container(
+                            width: 56,
+                            height: 56,
+                            decoration: BoxDecoration(
+                              color: AppColors.brand600,
+                              borderRadius: BorderRadius.circular(14),
                             ),
-                            const SizedBox(width: 10),
-                            const Text(
-                              'SURGICORP',
+                            alignment: Alignment.center,
+                            child: const Text(
+                              'S',
                               style: TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w800,
-                                letterSpacing: 1.4,
-                                fontSize: 18,
+                                fontSize: 22,
                               ),
                             ),
-                          ],
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 28),
+                      const SizedBox(height: 20),
                       Text(
-                        'Bienvenido(a)',
+                        'Mesa de Ayuda',
+                        textAlign: TextAlign.center,
                         style: AppTypography.textTheme.headlineMedium?.copyWith(
                           color: AppColors.brand600,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Mesa de Ayuda',
+                        'Bienvenido(a)',
+                        textAlign: TextAlign.center,
                         style: AppTypography.textTheme.bodyLarge?.copyWith(
                           color: AppColors.slate500,
                         ),
@@ -158,16 +139,19 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      CheckboxListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(
-                          'Recuérdame',
-                          style: AppTypography.textTheme.bodyMedium,
+                      Material(
+                        color: Colors.transparent,
+                        child: CheckboxListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            'Recuérdame',
+                            style: AppTypography.textTheme.bodyMedium,
+                          ),
+                          value: _remember,
+                          onChanged: (v) => setState(() => _remember = v ?? true),
+                          controlAffinity: ListTileControlAffinity.leading,
+                          activeColor: AppColors.brand600,
                         ),
-                        value: _remember,
-                        onChanged: (v) => setState(() => _remember = v ?? true),
-                        controlAffinity: ListTileControlAffinity.leading,
-                        activeColor: AppColors.brand600,
                       ),
                       if (auth.error != null) ...[
                         const SizedBox(height: 4),

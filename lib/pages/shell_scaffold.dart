@@ -45,7 +45,12 @@ class _ShellScaffoldState extends State<ShellScaffold> {
           Icons.insights_rounded,
           '/reportes',
         ),
-      const _NavItem('Perfil', Icons.person_outline, Icons.person_rounded, '/perfil'),
+      const _NavItem(
+        'Perfil',
+        Icons.person_outline,
+        Icons.person_rounded,
+        '/perfil',
+      ),
     ];
   }
 
@@ -62,11 +67,6 @@ class _ShellScaffoldState extends State<ShellScaffold> {
     return 0;
   }
 
-  String _titleFor(List<_NavItem> items, int index) {
-    if (index < 0 || index >= items.length) return 'Inicio';
-    return items[index].label;
-  }
-
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().user;
@@ -78,7 +78,7 @@ class _ShellScaffoldState extends State<ShellScaffold> {
     final content = Column(
       children: [
         _Topbar(
-          title: _titleFor(items, index),
+          title: 'Mesa de Ayuda',
           userName: user?.fullName,
           onProfile: () => context.go('/perfil'),
         ),
@@ -86,7 +86,9 @@ class _ShellScaffoldState extends State<ShellScaffold> {
           child: Align(
             alignment: Alignment.topCenter,
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: AppSpacing.maxContentWidth),
+              constraints: const BoxConstraints(
+                maxWidth: AppSpacing.maxContentWidth,
+              ),
               child: widget.child,
             ),
           ),
@@ -113,7 +115,9 @@ class _ShellScaffoldState extends State<ShellScaffold> {
       );
     }
 
-    final width = _collapsed ? AppSpacing.sidebarCollapsed : AppSpacing.sidebarExpanded;
+    final width = _collapsed
+        ? AppSpacing.sidebarCollapsed
+        : AppSpacing.sidebarExpanded;
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -123,114 +127,121 @@ class _ShellScaffoldState extends State<ShellScaffold> {
             duration: const Duration(milliseconds: 180),
             width: width,
             decoration: const BoxDecoration(
-              color: AppColors.white,
-              border: Border(right: BorderSide(color: AppColors.slate200)),
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [AppColors.shellSidebar, AppColors.shellSidebarEnd],
+              ),
+              border: Border(
+                right: BorderSide(color: AppColors.shellSidebarBorder),
+              ),
             ),
             child: SafeArea(
               child: Column(
                 children: [
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      _collapsed ? 8 : 16,
-                      16,
-                      _collapsed ? 8 : 8,
-                      8,
+                  Container(
+                    height: 64,
+                    alignment: Alignment.center,
+                    decoration: const BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(color: AppColors.shellSidebarBorder),
+                      ),
                     ),
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        // Durante la animación el ancho cambia antes/después de
-                        // `_collapsed`; usamos el espacio real para evitar overflow.
-                        final showBrand = constraints.maxWidth >= 120;
-                        final toggle = IconButton(
-                          tooltip: _collapsed ? 'Expandir' : 'Colapsar',
-                          visualDensity: VisualDensity.compact,
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(
-                            minWidth: 32,
-                            minHeight: 32,
-                          ),
-                          onPressed: () => setState(() => _collapsed = !_collapsed),
-                          icon: Icon(
-                            _collapsed ? Icons.menu_open_rounded : Icons.menu_rounded,
-                            size: 20,
-                            color: AppColors.slate500,
-                          ),
-                        );
-
-                        if (!showBrand) {
-                          return Center(
-                            child: Tooltip(
-                              message: 'Expandir',
-                              child: InkWell(
-                                onTap: () => setState(() => _collapsed = false),
-                                borderRadius: BorderRadius.circular(8),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.asset(
-                                    'assets/images/logo_surgi.png',
-                                    width: 32,
-                                    height: 32,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Container(
-                                      width: 32,
-                                      height: 32,
-                                      color: AppColors.navy700,
-                                      alignment: Alignment.center,
-                                      child: const Text(
-                                        'S',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w800,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: _collapsed ? 8 : 14,
+                      ),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          // Durante la animación el ancho cambia antes/después de
+                          // `_collapsed`; usamos el espacio real para evitar overflow.
+                          final showToggle = constraints.maxWidth >= 120;
+                          final toggle = IconButton(
+                            tooltip: _collapsed ? 'Expandir' : 'Colapsar',
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                              minWidth: 32,
+                              minHeight: 32,
+                            ),
+                            onPressed: () =>
+                                setState(() => _collapsed = !_collapsed),
+                            icon: Icon(
+                              _collapsed
+                                  ? Icons.menu_open_rounded
+                                  : Icons.menu_rounded,
+                              size: 22,
+                              color: AppColors.white.withValues(alpha: 0.92),
                             ),
                           );
-                        }
 
-                        return Row(
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
+                          // `mark` es solo el isotipo: en el rail colapsado el
+                          // logo completo (4.7:1) quedaría de pocos píxeles.
+                          Widget logo({
+                            required double height,
+                            bool mark = false,
+                          }) {
+                            return ColorFiltered(
+                              colorFilter: const ColorFilter.mode(
+                                AppColors.white,
+                                BlendMode.srcIn,
+                              ),
                               child: Image.asset(
-                                'assets/images/logo_surgi.png',
-                                width: 32,
-                                height: 32,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Container(
-                                  width: 32,
-                                  height: 32,
-                                  color: AppColors.navy700,
-                                  alignment: Alignment.center,
+                                mark
+                                    ? 'assets/images/logo_surgi_mark.png'
+                                    : 'assets/images/logo_surgi_trim.png',
+                                height: height,
+                                fit: BoxFit.contain,
+                                alignment: Alignment.center,
+                                errorBuilder: (_, __, ___) => SizedBox(
+                                  width: height * (mark ? 0.65 : 4.7),
+                                  height: height,
                                   child: const Text(
                                     'S',
                                     style: TextStyle(
-                                      color: Colors.white,
+                                      color: AppColors.white,
                                       fontWeight: FontWeight.w800,
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                'Mesa de Ayuda',
-                                style: AppTypography.textTheme.titleSmall,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                            );
+                          }
+
+                          if (!showToggle) {
+                            return Center(
+                              child: Tooltip(
+                                message: 'Expandir',
+                                child: InkWell(
+                                  onTap: () =>
+                                      setState(() => _collapsed = false),
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: logo(height: 28, mark: true),
+                                ),
                               ),
-                            ),
-                            toggle,
-                          ],
-                        );
-                      },
+                            );
+                          }
+
+                          // El logo va centrado en el sidebar; el toggle se ancla
+                          // a la derecha para no desplazarlo.
+                          return Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.only(right: 34),
+                                child: logo(height: 26),
+                              ),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: toggle,
+                              ),
+                            ],
+                          );
+                        },
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   for (var i = 0; i < items.length; i++)
                     _SidebarTile(
                       item: items[i],
@@ -240,23 +251,28 @@ class _ShellScaffoldState extends State<ShellScaffold> {
                   const Spacer(),
                   if (user != null)
                     Padding(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 14),
                       child: InkWell(
                         onTap: () => context.go('/perfil'),
                         borderRadius: BorderRadius.circular(12),
                         child: Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: AppColors.slate50,
+                            color: AppColors.shellSidebarHover,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppColors.slate200),
+                            border: Border.all(
+                              color: AppColors.shellSidebarBorder,
+                            ),
                           ),
                           child: LayoutBuilder(
                             builder: (context, constraints) {
                               final showDetails = constraints.maxWidth >= 100;
                               if (!showDetails) {
                                 return Center(
-                                  child: AppAvatar(name: user.fullName, size: 32),
+                                  child: AppAvatar(
+                                    name: user.fullName,
+                                    size: 32,
+                                  ),
                                 );
                               }
                               return Row(
@@ -265,19 +281,31 @@ class _ShellScaffoldState extends State<ShellScaffold> {
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           user.fullName,
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
-                                          style: AppTypography.textTheme.labelMedium,
+                                          style: AppTypography
+                                              .textTheme
+                                              .labelMedium
+                                              ?.copyWith(
+                                                color: AppColors.white,
+                                              ),
                                         ),
                                         Text(
                                           user.area ?? user.username,
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
-                                          style: AppTypography.textTheme.bodySmall,
+                                          style: AppTypography
+                                              .textTheme
+                                              .bodySmall
+                                              ?.copyWith(
+                                                color:
+                                                    AppColors.shellSidebarMuted,
+                                              ),
                                         ),
                                       ],
                                     ),
@@ -324,11 +352,12 @@ class _SidebarTile extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
       child: Material(
-        color: selected ? AppColors.brand50 : Colors.transparent,
+        color: selected ? AppColors.shellNavSelected : Colors.transparent,
         borderRadius: BorderRadius.circular(10),
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(10),
+          hoverColor: AppColors.shellSidebarHover,
           child: LayoutBuilder(
             builder: (context, constraints) {
               // Evita overflow durante la animación del sidebar.
@@ -338,8 +367,9 @@ class _SidebarTile extends StatelessWidget {
                 padding: EdgeInsets.symmetric(horizontal: showLabel ? 12 : 0),
                 alignment: showLabel ? null : Alignment.center,
                 child: Row(
-                  mainAxisAlignment:
-                      showLabel ? MainAxisAlignment.start : MainAxisAlignment.center,
+                  mainAxisAlignment: showLabel
+                      ? MainAxisAlignment.start
+                      : MainAxisAlignment.center,
                   children: [
                     if (selected && showLabel)
                       Container(
@@ -347,7 +377,7 @@ class _SidebarTile extends StatelessWidget {
                         height: 20,
                         margin: const EdgeInsets.only(right: 10),
                         decoration: BoxDecoration(
-                          color: AppColors.brand600,
+                          color: AppColors.brand500,
                           borderRadius: BorderRadius.circular(4),
                         ),
                       )
@@ -356,7 +386,9 @@ class _SidebarTile extends StatelessWidget {
                     Icon(
                       selected ? item.iconSelected : item.icon,
                       size: 20,
-                      color: selected ? AppColors.brand600 : AppColors.slate500,
+                      color: selected
+                          ? AppColors.brand500
+                          : AppColors.shellSidebarMuted,
                     ),
                     if (showLabel) ...[
                       const SizedBox(width: 10),
@@ -366,8 +398,12 @@ class _SidebarTile extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: AppTypography.textTheme.labelLarge?.copyWith(
-                            color: selected ? AppColors.brand600 : AppColors.slate700,
-                            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                            color: selected
+                                ? AppColors.white
+                                : AppColors.shellSidebarMuted,
+                            fontWeight: selected
+                                ? FontWeight.w700
+                                : FontWeight.w500,
                           ),
                         ),
                       ),
@@ -400,12 +436,18 @@ class _Topbar extends StatelessWidget {
       height: 64,
       padding: const EdgeInsets.symmetric(horizontal: 20),
       decoration: const BoxDecoration(
-        color: AppColors.white,
-        border: Border(bottom: BorderSide(color: AppColors.slate200)),
+        color: AppColors.shellTopbar,
+        border: Border(bottom: BorderSide(color: AppColors.shellTopbarBorder)),
       ),
       child: Row(
         children: [
-          Text(title, style: AppTypography.textTheme.titleLarge),
+          Text(
+            title,
+            style: AppTypography.textTheme.titleLarge?.copyWith(
+              color: AppColors.shellTopbarTitle,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
           if (ApiConfig.useMock) ...[
             const SizedBox(width: 10),
             Container(
@@ -413,7 +455,9 @@ class _Topbar extends StatelessWidget {
               decoration: BoxDecoration(
                 color: AppColors.accentSoft,
                 borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: AppColors.accent.withValues(alpha: 0.35)),
+                border: Border.all(
+                  color: AppColors.accent.withValues(alpha: 0.35),
+                ),
               ),
               child: Text(
                 'MOCK',
@@ -426,7 +470,12 @@ class _Topbar extends StatelessWidget {
           ],
           const Spacer(),
           if (userName != null) ...[
-            Text(userName!, style: AppTypography.textTheme.bodySmall),
+            Text(
+              userName!,
+              style: AppTypography.textTheme.bodySmall?.copyWith(
+                color: AppColors.shellTopbarTitle.withValues(alpha: 0.7),
+              ),
+            ),
             const SizedBox(width: 10),
             InkWell(
               onTap: onProfile,

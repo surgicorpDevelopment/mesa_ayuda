@@ -8,6 +8,8 @@ import '../../models/models.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_typography.dart';
+import '../../utils/attachment_files.dart';
+import '../../utils/open_attachment.dart';
 
 class ScreenshotPicker extends StatelessWidget {
   const ScreenshotPicker({
@@ -24,43 +26,16 @@ class ScreenshotPicker extends StatelessWidget {
   Future<void> _pick(BuildContext context) async {
     if (adjuntos.length >= maxFiles) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Máximo $maxFiles capturas por ticket')),
+        SnackBar(content: Text('Máximo $maxFiles adjuntos por ticket')),
       );
       return;
     }
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.image,
-      allowMultiple: true,
-      withData: true,
+    final picked = await pickAttachmentFiles(
+      context,
+      remaining: maxFiles - adjuntos.length,
     );
-    if (result == null || result.files.isEmpty) return;
-
-    final next = List<TicketAdjunto>.from(adjuntos);
-    for (final f in result.files) {
-      if (next.length >= maxFiles) break;
-      final bytes = f.bytes;
-      if (bytes == null || bytes.isEmpty) continue;
-      final mime = _mimeFromName(f.name);
-      final b64 = base64Encode(bytes);
-      next.add(
-        TicketAdjunto(
-          id: 'local_${DateTime.now().microsecondsSinceEpoch}_${next.length}',
-          nombre: f.name,
-          mimeType: mime,
-          sizeBytes: bytes.length,
-          url: 'data:$mime;base64,$b64',
-        ),
-      );
-    }
-    onChanged(next);
-  }
-
-  String _mimeFromName(String name) {
-    final lower = name.toLowerCase();
-    if (lower.endsWith('.png')) return 'image/png';
-    if (lower.endsWith('.gif')) return 'image/gif';
-    if (lower.endsWith('.webp')) return 'image/webp';
-    return 'image/jpeg';
+    if (picked.isEmpty) return;
+    onChanged([...adjuntos, ...picked]);
   }
 
   void _remove(int index) {
@@ -73,10 +48,10 @@ class ScreenshotPicker extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Capturas de pantalla', style: AppTypography.textTheme.labelMedium),
+        Text('Adjuntos', style: AppTypography.textTheme.labelMedium),
         const SizedBox(height: 6),
         Text(
-          'Adjunta hasta $maxFiles imágenes (PNG, JPG).',
+          'Hasta $maxFiles archivos: imágenes (PNG, JPG), PDF o Word (DOC, DOCX).',
           style: AppTypography.textTheme.bodySmall,
         ),
         const SizedBox(height: 10),
@@ -103,16 +78,16 @@ class ScreenshotPicker extends StatelessWidget {
                     color: AppColors.brand50,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.add_photo_alternate_outlined, color: AppColors.brand600),
+                  child: const Icon(Icons.attach_file, color: AppColors.brand600),
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'Haz clic para subir capturas',
+                  'Haz clic para subir archivos',
                   style: AppTypography.textTheme.titleSmall?.copyWith(color: AppColors.brand600),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'o arrastra archivos aquí (en desktop)',
+                  'PNG, JPG, PDF, DOC o DOCX',
                   style: AppTypography.textTheme.bodySmall,
                 ),
               ],
@@ -158,7 +133,10 @@ class _Thumb extends StatelessWidget {
             color: AppColors.white,
           ),
           clipBehavior: Clip.antiAlias,
-          child: AttachmentImage(url: adjunto.url, fit: BoxFit.cover),
+          child: InkWell(
+            onTap: () => previewOrOpenAttachment(context, adjunto),
+            child: AttachmentPreview(adjunto: adjunto, fit: BoxFit.cover),
+          ),
         ),
         Positioned(
           top: -6,
@@ -185,7 +163,7 @@ class _Thumb extends StatelessWidget {
 ///
 /// Modo solo lectura (por defecto): muestra miniaturas clicables.
 /// Modo editable: pasa [onAdd] y/o [onRemove] para activar el botón "+"
-/// y la "×" sobre cada imagen.
+/// y la "×" sobre cada archivo.
 class AttachmentGallery extends StatelessWidget {
   const AttachmentGallery({
     super.key,
@@ -214,77 +192,15 @@ class AttachmentGallery extends StatelessWidget {
   Future<void> _pick(BuildContext context) async {
     if (adjuntos.length >= maxFiles) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Máximo $maxFiles capturas por ticket')),
+        SnackBar(content: Text('Máximo $maxFiles adjuntos')),
       );
       return;
     }
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.image,
-      allowMultiple: true,
-      withData: true,
+    final nuevos = await pickAttachmentFiles(
+      context,
+      remaining: maxFiles - adjuntos.length,
     );
-    if (result == null || result.files.isEmpty) return;
-
-    final nuevos = <TicketAdjunto>[];
-    for (final f in result.files) {
-      if (adjuntos.length + nuevos.length >= maxFiles) break;
-      final bytes = f.bytes;
-      if (bytes == null || bytes.isEmpty) continue;
-      final mime = _mimeFromName(f.name);
-      nuevos.add(TicketAdjunto(
-        id: 'local_${DateTime.now().microsecondsSinceEpoch}_${nuevos.length}',
-        nombre: f.name,
-        mimeType: mime,
-        sizeBytes: bytes.length,
-        url: 'data:$mime;base64,${base64Encode(bytes)}',
-      ));
-    }
     if (nuevos.isNotEmpty) await onAdd?.call(nuevos);
-  }
-
-  String _mimeFromName(String name) {
-    final lower = name.toLowerCase();
-    if (lower.endsWith('.png')) return 'image/png';
-    if (lower.endsWith('.gif')) return 'image/gif';
-    if (lower.endsWith('.webp')) return 'image/webp';
-    return 'image/jpeg';
-  }
-
-  void _open(BuildContext context, TicketAdjunto a) {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => Dialog(
-        backgroundColor: Colors.black,
-        insetPadding: const EdgeInsets.all(24),
-        child: Stack(
-          children: [
-            InteractiveViewer(
-              child: Center(
-                child: AttachmentImage(url: a.url, fit: BoxFit.contain),
-              ),
-            ),
-            Positioned(
-              top: 8,
-              right: 8,
-              child: IconButton(
-                onPressed: () => Navigator.pop(ctx),
-                icon: const Icon(Icons.close, color: Colors.white),
-              ),
-            ),
-            Positioned(
-              left: 16,
-              bottom: 16,
-              right: 16,
-              child: Text(
-                a.nombre,
-                style: const TextStyle(color: Colors.white70),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   @override
@@ -296,7 +212,7 @@ class AttachmentGallery extends StatelessWidget {
       children: [
         Row(
           children: [
-            Text('Capturas adjuntas', style: AppTypography.textTheme.titleSmall),
+            Text('Adjuntos', style: AppTypography.textTheme.titleSmall),
             if (_editable) ...[
               const SizedBox(width: 6),
               Text(
@@ -308,20 +224,18 @@ class AttachmentGallery extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         if (adjuntos.isEmpty && !_editable)
-          Text('Sin capturas adjuntas', style: AppTypography.textTheme.bodySmall)
+          Text('Sin adjuntos', style: AppTypography.textTheme.bodySmall)
         else
           Wrap(
             spacing: 10,
             runSpacing: 10,
             children: [
-              // Miniaturas existentes
               for (final a in adjuntos)
                 _GalleryThumb(
                   adjunto: a,
-                  onOpen: () => _open(context, a),
+                  onOpen: () => previewOrOpenAttachment(context, a),
                   onRemove: onRemove != null ? () => onRemove!(a) : null,
                 ),
-              // Botón "+" para añadir
               if (canAdd)
                 _AddThumb(
                   saving: saving,
@@ -357,7 +271,7 @@ class _GalleryThumb extends StatelessWidget {
               border: Border.all(color: AppColors.slate200),
             ),
             clipBehavior: Clip.antiAlias,
-            child: AttachmentImage(url: adjunto.url, fit: BoxFit.cover),
+            child: AttachmentPreview(adjunto: adjunto, fit: BoxFit.cover),
           ),
         ),
         if (onRemove != null)
@@ -409,11 +323,88 @@ class _AddThumb extends StatelessWidget {
             : const Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.add_photo_alternate_outlined, color: AppColors.brand600, size: 28),
+                  Icon(Icons.attach_file, color: AppColors.brand600, size: 28),
                   SizedBox(height: 4),
                   Text('Agregar', style: TextStyle(fontSize: 11, color: AppColors.brand600)),
                 ],
               ),
+      ),
+    );
+  }
+}
+
+/// Miniatura de imagen o icono de documento según el tipo.
+class AttachmentPreview extends StatelessWidget {
+  const AttachmentPreview({
+    super.key,
+    required this.adjunto,
+    this.fit = BoxFit.cover,
+  });
+
+  final TicketAdjunto adjunto;
+  final BoxFit fit;
+
+  @override
+  Widget build(BuildContext context) {
+    if (isImageAttachment(mimeType: adjunto.mimeType, nombre: adjunto.nombre)) {
+      return AttachmentImage(url: adjunto.url, fit: fit);
+    }
+    return _DocumentTile(adjunto: adjunto);
+  }
+}
+
+class _DocumentTile extends StatelessWidget {
+  const _DocumentTile({required this.adjunto});
+
+  final TicketAdjunto adjunto;
+
+  @override
+  Widget build(BuildContext context) {
+    final pdf = isPdfAttachment(mimeType: adjunto.mimeType, nombre: adjunto.nombre);
+    final word = isWordAttachment(mimeType: adjunto.mimeType, nombre: adjunto.nombre);
+    final color = pdf
+        ? AppColors.danger
+        : word
+            ? AppColors.brand600
+            : AppColors.slate700;
+    final bg = pdf
+        ? AppColors.dangerSoft
+        : word
+            ? AppColors.brand50
+            : AppColors.slate100;
+    final icon = pdf
+        ? Icons.picture_as_pdf_outlined
+        : word
+            ? Icons.description_outlined
+            : Icons.insert_drive_file_outlined;
+
+    return ColoredBox(
+      color: bg,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 6),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: color, size: 26),
+            const SizedBox(height: 4),
+            Text(
+              attachmentExtensionLabel(adjunto.nombre),
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              adjunto.nombre,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 9, color: AppColors.slate700),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -468,4 +459,105 @@ class _BrokenImage extends StatelessWidget {
 /// Helper para convertir bytes a data URL (tests / mock).
 String bytesToDataUrl(Uint8List bytes, {String mime = 'image/png'}) {
   return 'data:$mime;base64,${base64Encode(bytes)}';
+}
+
+Future<List<TicketAdjunto>> pickAttachmentFiles(
+  BuildContext context, {
+  required int remaining,
+}) async {
+  if (remaining <= 0) return const [];
+  final result = await FilePicker.platform.pickFiles(
+    type: FileType.custom,
+    allowedExtensions: kAllowedAttachmentExtensions,
+    allowMultiple: true,
+    withData: true,
+  );
+  if (result == null || result.files.isEmpty) return const [];
+
+  final nuevos = <TicketAdjunto>[];
+  var skippedType = false;
+  var skippedSize = false;
+  for (final f in result.files) {
+    if (nuevos.length >= remaining) break;
+    final bytes = f.bytes;
+    if (bytes == null || bytes.isEmpty) continue;
+    if (!isAllowedAttachmentName(f.name)) {
+      skippedType = true;
+      continue;
+    }
+    if (bytes.length > kMaxAttachmentBytes) {
+      skippedSize = true;
+      continue;
+    }
+    final mime = mimeFromFileName(f.name);
+    nuevos.add(
+      TicketAdjunto(
+        id: 'local_${DateTime.now().microsecondsSinceEpoch}_${nuevos.length}',
+        nombre: f.name,
+        mimeType: mime,
+        sizeBytes: bytes.length,
+        url: 'data:$mime;base64,${base64Encode(bytes)}',
+      ),
+    );
+  }
+
+  if (!context.mounted) return nuevos;
+  if (skippedType) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Algunos archivos no son compatibles (PNG, JPG, PDF o Word).'),
+      ),
+    );
+  } else if (skippedSize) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Algunos archivos superan el límite de 30 MB.')),
+    );
+  }
+  return nuevos;
+}
+
+Future<void> previewOrOpenAttachment(BuildContext context, TicketAdjunto a) async {
+  if (isImageAttachment(mimeType: a.mimeType, nombre: a.nombre)) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: const EdgeInsets.all(24),
+        child: Stack(
+          children: [
+            InteractiveViewer(
+              child: Center(
+                child: AttachmentImage(url: a.url, fit: BoxFit.contain),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton(
+                onPressed: () => Navigator.pop(ctx),
+                icon: const Icon(Icons.close, color: Colors.white),
+              ),
+            ),
+            Positioned(
+              left: 16,
+              bottom: 16,
+              right: 16,
+              child: Text(
+                a.nombre,
+                style: const TextStyle(color: Colors.white70),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    return;
+  }
+
+  final opened = await openAttachment(a);
+  if (opened || !context.mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text('No se pudo abrir ${a.nombre}')),
+  );
 }

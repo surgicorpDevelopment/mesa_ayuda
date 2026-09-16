@@ -237,7 +237,7 @@ class _KanbanBoardState extends State<KanbanBoard> {
                 ),
                 const SizedBox(height: 14),
                 DropdownButtonFormField<int?>(
-                  value: selectedUserId,
+                  initialValue: selectedUserId,
                   decoration: const InputDecoration(
                     labelText: 'Asignado a',
                     prefixIcon: Icon(Icons.person_outline),
@@ -291,7 +291,7 @@ class _KanbanBoardState extends State<KanbanBoard> {
                 if (widget.usuarios.isNotEmpty) ...[
                   const SizedBox(height: 14),
                   DropdownButtonFormField<int?>(
-                    value: selectedUserId,
+                    initialValue: selectedUserId,
                     decoration: const InputDecoration(
                       labelText: 'Asignar a (opcional)',
                       prefixIcon: Icon(Icons.person_outline),

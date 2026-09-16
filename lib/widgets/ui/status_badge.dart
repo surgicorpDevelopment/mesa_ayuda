@@ -10,18 +10,24 @@ class StatusBadge extends StatelessWidget {
     required this.color,
     this.softColor,
     this.showDot = true,
+    this.width,
   });
+
+  /// Ancho fijo para alinear badges en listas (cubre "En Proceso" / "Planificado").
+  static const double estadoWidth = 108;
 
   final String label;
   final Color color;
   final Color? softColor;
   final bool showDot;
+  final double? width;
 
-  factory StatusBadge.estado(String estado) {
+  factory StatusBadge.estado(String estado, {double? width = estadoWidth}) {
     return StatusBadge(
       label: labelEstado(estado),
       color: estadoColor(estado),
       softColor: estadoSoft(estado),
+      width: width,
     );
   }
 
@@ -29,6 +35,7 @@ class StatusBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final bg = softColor ?? color.withValues(alpha: 0.12);
     return Container(
+      width: width,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: bg,
@@ -36,7 +43,8 @@ class StatusBadge extends StatelessWidget {
         border: Border.all(color: color.withValues(alpha: 0.22)),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: width == null ? MainAxisSize.min : MainAxisSize.max,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           if (showDot) ...[
             Container(
@@ -46,10 +54,21 @@ class StatusBadge extends StatelessWidget {
             ),
             const SizedBox(width: 6),
           ],
-          Text(
-            label,
-            style: AppTypography.textTheme.labelMedium?.copyWith(color: color),
-          ),
+          if (width == null)
+            Text(
+              label,
+              style: AppTypography.textTheme.labelMedium?.copyWith(color: color),
+            )
+          else
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: AppTypography.textTheme.labelMedium?.copyWith(color: color),
+              ),
+            ),
         ],
       ),
     );
@@ -57,27 +76,38 @@ class StatusBadge extends StatelessWidget {
 }
 
 class PriorityIndicator extends StatelessWidget {
-  const PriorityIndicator({super.key, required this.prioridad});
+  const PriorityIndicator({
+    super.key,
+    required this.prioridad,
+    this.width = priorityWidth,
+  });
+
+  /// Ancho fijo para Alta / Media / Baja.
+  static const double priorityWidth = 78;
 
   final String prioridad;
+  final double? width;
 
   @override
   Widget build(BuildContext context) {
     final color = prioridadColor(prioridad);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      width: width,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: prioridadSoft(prioridad),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: width == null ? MainAxisSize.min : MainAxisSize.max,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.flag_rounded, size: 12, color: color),
-          const SizedBox(width: 4),
+          Icon(Icons.flag_rounded, size: 14, color: color),
+          const SizedBox(width: 6),
           Text(
             labelPrioridad(prioridad),
-            style: AppTypography.textTheme.labelSmall?.copyWith(color: color),
+            style: AppTypography.textTheme.labelMedium?.copyWith(color: color),
           ),
         ],
       ),

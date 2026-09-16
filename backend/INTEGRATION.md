@@ -31,7 +31,7 @@ python manage.py setup_gp_groups
 python manage.py seed_gp_sistemas
 ```
 
-Las migraciones 0001–0006 vienen en el repo: usar `migrate` directo, **sin**
+Las migraciones 0001–0007 vienen en el repo: usar `migrate` directo, **sin**
 `makemigrations`, para no generar una migración duplicada en el servidor.
 
 `0001_initial` depende de `ServidorCaminitos.0170_...` (igual que CajaChica),
@@ -89,6 +89,25 @@ Las reglas de visibilidad viven en un solo sitio, `GestionProyectos/scoping.py`
 | Productividad | `GET /GP_Productividad/?desde=YYYY-MM-DD&hasta=YYYY-MM-DD` |
 
 Auth: `Authorization: Bearer <access>` de `POST /api/token/`.
+
+### Fechas de proyecto
+
+`GP_Proyecto` tiene un rango planificado opcional:
+
+- `fecha_inicio` (date)
+- `fecha_objetivo` (date) — fecha **fin** planificada (el nombre de columna se reutiliza)
+
+Si ambas vienen, `fecha_inicio` no puede ser posterior a `fecha_objetivo`.
+
+### Historial de estado
+
+`GET /GP_HistorialEstado/?tipo=ticket|proyecto|tarea&ref_id=<id>` devuelve el
+timeline de cambios (`estado_anterior`, `estado_nuevo`, `usuario_detail`, `fecha`).
+Se escribe automáticamente al crear o al cambiar `estado` (tickets, proyectos y
+tareas). El frontend lo usa en el detalle; no hay que mandar eventos a mano.
+
+Los hitos de un ticket (atendido / resuelto / cerrado) se derivan de ese historial:
+primera vez en `en_proceso`, `resuelto` y `cerrado`.
 
 ### `GET /GP_Usuario/me/`
 

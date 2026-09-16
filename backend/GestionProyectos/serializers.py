@@ -69,12 +69,29 @@ class GP_ProyectoSerializer(serializers.ModelSerializer):
             'creado_por',
             'creado_por_detail',
             'adjuntos',
+            'fecha_inicio',
             'fecha_objetivo',
             'fecha_creacion',
             'fecha_actualizacion',
             'tickets_count',
         ]
         read_only_fields = ['creado_por', 'fecha_creacion', 'fecha_actualizacion']
+
+    def validate(self, attrs):
+        instance = self.instance
+        inicio = attrs.get(
+            'fecha_inicio',
+            getattr(instance, 'fecha_inicio', None) if instance is not None else None,
+        )
+        fin = attrs.get(
+            'fecha_objetivo',
+            getattr(instance, 'fecha_objetivo', None) if instance is not None else None,
+        )
+        if inicio and fin and inicio > fin:
+            raise serializers.ValidationError(
+                {'fecha_inicio': 'La fecha de inicio no puede ser posterior a la fecha fin.'}
+            )
+        return attrs
 
 
 class GP_TareaSerializer(serializers.ModelSerializer):

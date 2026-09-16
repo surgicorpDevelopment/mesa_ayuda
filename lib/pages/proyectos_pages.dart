@@ -8,6 +8,7 @@ import '../providers/auth_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../theme/app_typography.dart';
+import '../utils/date_format.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/ui/ui.dart';
 
@@ -130,7 +131,7 @@ class _ProyectosListPageState extends State<ProyectosListPage> {
                               padding: const EdgeInsets.fromLTRB(24, 8, 24, 88),
                               gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                                 maxCrossAxisExtent: 380,
-                                mainAxisExtent: 210,
+                                mainAxisExtent: 248,
                                 crossAxisSpacing: 12,
                                 mainAxisSpacing: 12,
                               ),
@@ -158,13 +159,32 @@ class _ProyectosListPageState extends State<ProyectosListPage> {
                                           StatusBadge.estado(p.estado),
                                         ],
                                       ),
+                                      if (p.atrasado) ...[
+                                        const SizedBox(height: 6),
+                                        Align(
+                                          alignment: Alignment.centerLeft,
+                                          child: StatusBadge(
+                                            label: 'Atrasado',
+                                            color: AppColors.danger,
+                                            softColor: AppColors.dangerSoft,
+                                            showDot: false,
+                                          ),
+                                        ),
+                                      ],
                                       const SizedBox(height: 8),
                                       Expanded(
                                         child: Text(
                                           p.descripcion.isEmpty ? 'Sin descripción' : p.descripcion,
-                                          maxLines: 3,
+                                          maxLines: 2,
                                           overflow: TextOverflow.ellipsis,
                                           style: AppTypography.textTheme.bodySmall,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        formatDateRange(p.fechaInicio, p.fechaFin),
+                                        style: AppTypography.textTheme.labelSmall?.copyWith(
+                                          color: p.atrasado ? AppColors.danger : AppColors.slate500,
                                         ),
                                       ),
                                       const SizedBox(height: 8),
@@ -224,6 +244,8 @@ class _ProyectoFormPageState extends State<ProyectoFormPage> {
   String _prioridad = 'media';
   String _estado = 'idea';
   int? _areaId;
+  DateTime? _fechaInicio;
+  DateTime? _fechaFin;
   List<AreaOption> _areas = [];
   bool _loadingAreas = false;
   bool _saving = false;
@@ -255,6 +277,15 @@ class _ProyectoFormPageState extends State<ProyectoFormPage> {
 
   Future<void> _save() async {
     if (_titulo.text.trim().isEmpty) return;
+    if (_fechaInicio != null &&
+        _fechaFin != null &&
+        DateTime(_fechaInicio!.year, _fechaInicio!.month, _fechaInicio!.day)
+            .isAfter(DateTime(_fechaFin!.year, _fechaFin!.month, _fechaFin!.day))) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('La fecha de inicio no puede ser posterior a la fecha fin.')),
+      );
+      return;
+    }
     setState(() => _saving = true);
     try {
       final auth = context.read<AuthProvider>();
@@ -265,6 +296,8 @@ class _ProyectoFormPageState extends State<ProyectoFormPage> {
         'estado': _estado,
         'area_id': _areaId ?? auth.user?.areaId,
         'responsable': auth.user?.id,
+        'fecha_inicio': _fechaInicio?.toIso8601String().split('T').first,
+        'fecha_objetivo': _fechaFin?.toIso8601String().split('T').first,
       });
       if (!mounted) return;
       context.go('/proyectos/${proyecto.id}');
@@ -308,7 +341,7 @@ class _ProyectoFormPageState extends State<ProyectoFormPage> {
                         )
                       else
                         DropdownButtonFormField<int?>(
-                          value: _areaId,
+                          initialValue: _areaId,
                           decoration: const InputDecoration(
                             labelText: 'Área',
                             prefixIcon: Icon(Icons.business_outlined),
@@ -323,7 +356,7 @@ class _ProyectoFormPageState extends State<ProyectoFormPage> {
                     ],
                     const SizedBox(height: 14),
                     DropdownButtonFormField<String>(
-                      value: _estado,
+                      initialValue: _estado,
                       decoration: const InputDecoration(labelText: 'Estado'),
                       items: const [
                         DropdownMenuItem(value: 'idea', child: Text('En Idea')),
@@ -334,7 +367,7 @@ class _ProyectoFormPageState extends State<ProyectoFormPage> {
                     ),
                     const SizedBox(height: 14),
                     DropdownButtonFormField<String>(
-                      value: _prioridad,
+                      initialValue: _prioridad,
                       decoration: const InputDecoration(labelText: 'Prioridad'),
                       items: const [
                         DropdownMenuItem(value: 'alta', child: Text('Alta')),
@@ -342,6 +375,26 @@ class _ProyectoFormPageState extends State<ProyectoFormPage> {
                         DropdownMenuItem(value: 'baja', child: Text('Baja')),
                       ],
                       onChanged: (v) => setState(() => _prioridad = v ?? 'media'),
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DateField(
+                            label: 'Fecha inicio',
+                            value: _fechaInicio,
+                            onChanged: (v) => setState(() => _fechaInicio = v),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: DateField(
+                            label: 'Fecha fin',
+                            value: _fechaFin,
+                            onChanged: (v) => setState(() => _fechaFin = v),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 24),
                     AppButton(label: 'Crear proyecto', loading: _saving, onPressed: _saving ? null : _save, expanded: true),
@@ -370,9 +423,11 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
   Proyecto? _proyecto;
   List<Tarea> _tareas = [];
   List<AssignableUser> _usuarios = [];
+  List<HistorialEstado> _historial = [];
   bool _loading = true;
   String? _error;
   bool _savingAdjunto = false;
+  bool _loadingHistorial = false;
 
   late final TabController _tabController;
 
@@ -408,6 +463,7 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
           _usuarios = results[2] as List<AssignableUser>;
           _loading = false;
         });
+        _loadHistorial();
       }
     } catch (e) {
       if (mounted) {
@@ -419,9 +475,49 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
     }
   }
 
+  Future<void> _loadHistorial() async {
+    if (!mounted) return;
+    setState(() => _loadingHistorial = true);
+    try {
+      final list = await context.read<AuthProvider>().api.fetchHistorial('proyecto', widget.id);
+      if (mounted) {
+        setState(() {
+          _historial = list;
+          _loadingHistorial = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingHistorial = false);
+    }
+  }
+
   Future<void> _setEstado(String estado) async {
     try {
       final p = await context.read<AuthProvider>().api.updateProyecto(widget.id, {'estado': estado});
+      if (mounted) setState(() => _proyecto = p);
+      await _loadHistorial();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
+  Future<void> _setFechas({DateTime? inicio, DateTime? fin}) async {
+    if (inicio != null &&
+        fin != null &&
+        DateTime(inicio.year, inicio.month, inicio.day)
+            .isAfter(DateTime(fin.year, fin.month, fin.day))) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('La fecha de inicio no puede ser posterior a la fecha fin.')),
+      );
+      return;
+    }
+    try {
+      final p = await context.read<AuthProvider>().api.updateProyecto(widget.id, {
+        'fecha_inicio': inicio?.toIso8601String().split('T').first,
+        'fecha_objetivo': fin?.toIso8601String().split('T').first,
+      });
       if (mounted) setState(() => _proyecto = p);
     } catch (e) {
       if (!mounted) return;
@@ -604,9 +700,17 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
             children: [
               Wrap(
                 spacing: 8,
+                runSpacing: 8,
                 children: [
                   StatusBadge.estado(p.estado),
                   PriorityIndicator(prioridad: p.prioridad),
+                  if (p.atrasado)
+                    const StatusBadge(
+                      label: 'Atrasado',
+                      color: AppColors.danger,
+                      softColor: AppColors.dangerSoft,
+                      showDot: false,
+                    ),
                 ],
               ),
               const SizedBox(height: 14),
@@ -625,6 +729,34 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
                   ),
                 ],
               ),
+              const SizedBox(height: 16),
+              if (canManage)
+                Row(
+                  children: [
+                    Expanded(
+                      child: DateField(
+                        label: 'Fecha inicio',
+                        value: p.fechaInicio,
+                        onChanged: (v) => _setFechas(inicio: v, fin: p.fechaFin),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: DateField(
+                        label: 'Fecha fin',
+                        value: p.fechaFin,
+                        onChanged: (v) => _setFechas(inicio: p.fechaInicio, fin: v),
+                      ),
+                    ),
+                  ],
+                )
+              else
+                Text(
+                  formatDateRange(p.fechaInicio, p.fechaFin),
+                  style: AppTypography.textTheme.bodySmall?.copyWith(
+                    color: p.atrasado ? AppColors.danger : AppColors.slate500,
+                  ),
+                ),
               const SizedBox(height: 16),
               AttachmentGallery(
                 adjuntos: p.adjuntos,
@@ -661,6 +793,13 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
             refId: widget.id,
             load: () => context.read<AuthProvider>().api.fetchComentarios('proyecto', widget.id),
             onSubmit: (c) => context.read<AuthProvider>().api.createComentario('proyecto', widget.id, c),
+          ),
+        ),
+        const SizedBox(height: 16),
+        AppCard(
+          child: HistorialPanel(
+            items: _historial,
+            loading: _loadingHistorial,
           ),
         ),
       ],

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Paleta corporativa alineada al portal de picking (navy + brand blue + accent).
+/// Paleta Mesa de Ayuda: teal de identidad + navy de fallback de marca.
 class AppColors {
   AppColors._();
 
@@ -8,9 +8,9 @@ class AppColors {
   static const Color navy700 = Color(0xFF17365D);
   static const Color navy500 = Color(0xFF2A4A6F);
 
-  static const Color brand600 = Color(0xFF1565C0);
-  static const Color brand500 = Color(0xFF1E78D6);
-  static const Color brand50 = Color(0xFFE8F1FB);
+  static const Color brand600 = Color(0xFF0F766E);
+  static const Color brand500 = Color(0xFF14B8A6);
+  static const Color brand50 = Color(0xFFF0FDFA);
 
   static const Color accent = Color(0xFFE8722A);
   static const Color accentSoft = Color(0xFFFFF0E6);
@@ -38,6 +38,17 @@ class AppColors {
   static const Color bg = slate50;
   static const Color card = white;
   static const Color muted = slate500;
+
+  /// Chrome del shell: navy índigo (tono del menú corporativo) + sage.
+  static const Color shellSidebar = Color(0xFF1B2438);
+  static const Color shellSidebarEnd = Color(0xFF171A2E);
+  static const Color shellSidebarBorder = Color(0xFF2A3450);
+  static const Color shellSidebarMuted = Color(0xFFB8C4D6);
+  static const Color shellSidebarHover = Color(0xFF24304A);
+  static const Color shellNavSelected = Color(0xFF2C3A58);
+  static const Color shellTopbar = Color(0xFFE7F0EE);
+  static const Color shellTopbarBorder = Color(0xFFD3E0DD);
+  static const Color shellTopbarTitle = Color(0xFF0F3D3A);
 
   // Compat aliases usados en código previo
   static const Color navy = navy900;

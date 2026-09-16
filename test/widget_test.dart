@@ -4,7 +4,7 @@ import 'package:gestor_proyectos/main.dart';
 void main() {
   testWidgets('App arranca sin crash', (tester) async {
     await tester.pumpWidget(const GestorApp());
-    await tester.pump();
+    await tester.pumpAndSettle(const Duration(milliseconds: 100));
     expect(find.byType(GestorApp), findsOneWidget);
   });
 }

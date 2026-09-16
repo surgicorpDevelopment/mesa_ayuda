@@ -8,6 +8,7 @@ import '../config/api_config.dart';
 import '../config/sistemas_catalog.dart';
 import '../models/app_user.dart';
 import '../models/models.dart';
+import '../utils/attachment_files.dart';
 import 'mock_data_store.dart';
 
 class ApiException implements Exception {
@@ -405,6 +406,17 @@ class ApiClient {
     return out;
   }
 
+  MediaType _mediaTypeFor(TicketAdjunto adjunto) {
+    final raw = (adjunto.mimeType != null && adjunto.mimeType!.isNotEmpty)
+        ? adjunto.mimeType!
+        : mimeFromFileName(adjunto.nombre);
+    try {
+      return MediaType.parse(raw);
+    } catch (_) {
+      return MediaType('application', 'octet-stream');
+    }
+  }
+
   Future<Ticket> updateTicket(int id, Map<String, dynamic> body) async {
     if (ApiConfig.useMock) {
       await Future<void>.delayed(const Duration(milliseconds: 150));
@@ -414,7 +426,13 @@ class ApiClient {
           final aid = body['asignado_a'] as int;
           assignName = aid == _userId ? _userName : _mock.nameForUser(aid);
         }
-        return _mock.updateTicket(id, body, assignName: assignName);
+        return _mock.updateTicket(
+          id,
+          body,
+          assignName: assignName,
+          actorId: _userId,
+          actorName: _userName,
+        );
       } catch (_) {
         throw ApiException(404, 'Ticket $id no encontrado (mock)');
       }
@@ -445,7 +463,7 @@ class ApiClient {
           'archivo',
           bytes,
           filename: adjunto.nombre,
-          contentType: MediaType.parse(adjunto.mimeType ?? 'image/jpeg'),
+          contentType: _mediaTypeFor(adjunto),
         ));
       }
     }
@@ -556,7 +574,7 @@ class ApiClient {
           'archivo',
           bytes,
           filename: adjunto.nombre,
-          contentType: MediaType.parse(adjunto.mimeType ?? 'image/jpeg'),
+          contentType: _mediaTypeFor(adjunto),
         ));
       }
     }
@@ -632,7 +650,12 @@ class ApiClient {
     if (ApiConfig.useMock) {
       await Future<void>.delayed(const Duration(milliseconds: 150));
       try {
-        return _mock.updateProyecto(id, body);
+        return _mock.updateProyecto(
+          id,
+          body,
+          actorId: _userId,
+          actorName: _userName,
+        );
       } catch (_) {
         throw ApiException(404, 'Proyecto $id no encontrado (mock)');
       }
@@ -671,6 +694,21 @@ class ApiClient {
       'cuerpo': cuerpo,
     });
     return Comentario.fromJson(data);
+  }
+
+  Future<List<HistorialEstado>> fetchHistorial(String tipo, int refId) async {
+    if (ApiConfig.useMock) {
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+      return _mock.listHistorial(tipo, refId);
+    }
+    final data = await _get(ApiConfig.historialPath, query: {
+      'tipo': tipo,
+      'ref_id': '$refId',
+      'format': 'json',
+    });
+    final items = _results(data).map(HistorialEstado.fromJson).toList()
+      ..sort((a, b) => a.fecha.compareTo(b.fecha));
+    return items;
   }
 
   // ── Tareas ────────────────────────────────────────────────────────────

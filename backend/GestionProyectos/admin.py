@@ -21,7 +21,17 @@ class GP_SistemaAdmin(admin.ModelAdmin):
 
 @admin.register(GP_Proyecto)
 class GP_ProyectoAdmin(admin.ModelAdmin):
-    list_display = ('id', 'titulo', 'estado', 'prioridad', 'area_id', 'responsable', 'fecha_actualizacion')
+    list_display = (
+        'id',
+        'titulo',
+        'estado',
+        'prioridad',
+        'area_id',
+        'responsable',
+        'fecha_inicio',
+        'fecha_objetivo',
+        'fecha_actualizacion',
+    )
     list_filter = ('estado', 'prioridad', 'area_id')
     search_fields = ('titulo', 'descripcion')
 

@@ -6,6 +6,15 @@ from django.db import migrations, models
 import django.db.models.deletion
 
 
+def _servidor_caminitos_installed():
+    """True en DjangoNewAPI; False en el harness local (backend/local)."""
+    for app in settings.INSTALLED_APPS:
+        label = app if isinstance(app, str) else getattr(app, 'name', '')
+        if label == 'ServidorCaminitos' or label.startswith('ServidorCaminitos.'):
+            return True
+    return False
+
+
 class Migration(migrations.Migration):
 
     initial = True
@@ -13,7 +22,12 @@ class Migration(migrations.Migration):
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
         # ExtendedUsers no está en ServidorCaminitos.0001; igual que CajaChica.
-        ('ServidorCaminitos', '0170_gr_regularizacion_lima_provincia'),
+        # Solo en el servidor real: el harness local no tiene esa app.
+        *(
+            [('ServidorCaminitos', '0170_gr_regularizacion_lima_provincia')]
+            if _servidor_caminitos_installed()
+            else []
+        ),
     ]
 
     operations = [

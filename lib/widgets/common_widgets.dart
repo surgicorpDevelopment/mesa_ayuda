@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
+import '../utils/date_format.dart';
 import 'ui/section_header.dart';
 import 'ui/status_badge.dart';
 
@@ -96,14 +97,6 @@ class _ComentariosPanelState extends State<ComentariosPanel> {
     }
   }
 
-  String _relative(DateTime? dt) {
-    if (dt == null) return '';
-    final diff = DateTime.now().difference(dt);
-    if (diff.inMinutes < 60) return 'hace ${diff.inMinutes} min';
-    if (diff.inHours < 24) return 'hace ${diff.inHours} h';
-    return 'hace ${diff.inDays} d';
-  }
-
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -141,7 +134,7 @@ class _ComentariosPanelState extends State<ComentariosPanel> {
                     children: [
                       Text(autor, style: AppTypography.textTheme.labelMedium),
                       const Spacer(),
-                      Text(_relative(fecha), style: AppTypography.textTheme.bodySmall),
+                      Text(formatRelative(fecha, empty: ''), style: AppTypography.textTheme.bodySmall),
                     ],
                   ),
                   const SizedBox(height: 6),
@@ -165,7 +158,7 @@ class _ComentariosPanelState extends State<ComentariosPanel> {
             const SizedBox(width: 8),
             IconButton.filled(
               style: IconButton.styleFrom(
-                backgroundColor: AppColors.navy900,
+                backgroundColor: AppColors.brand600,
                 foregroundColor: Colors.white,
               ),
               onPressed: _sending ? null : _send,

@@ -74,6 +74,8 @@ class MockDataStore {
         responsableId: 3,
         responsableNombre: 'Jeshua Cabanillas',
         creadoPorId: 3,
+        fechaInicio: now.subtract(const Duration(days: 18)),
+        fechaObjetivo: now.subtract(const Duration(days: 2)),
         fechaCreacion: now.subtract(const Duration(days: 20)),
         fechaActualizacion: now.subtract(const Duration(hours: 5)),
         ticketsCount: 3,
@@ -88,6 +90,8 @@ class MockDataStore {
         responsableId: 3,
         responsableNombre: 'Jeshua Cabanillas',
         creadoPorId: 3,
+        fechaInicio: now.add(const Duration(days: 10)),
+        fechaObjetivo: now.add(const Duration(days: 50)),
         fechaCreacion: now.subtract(const Duration(days: 7)),
         fechaActualizacion: now.subtract(const Duration(days: 1)),
         ticketsCount: 2,
@@ -102,6 +106,8 @@ class MockDataStore {
         responsableId: 12,
         responsableNombre: 'Jairo Mendoza',
         creadoPorId: 3,
+        fechaInicio: now.subtract(const Duration(days: 55)),
+        fechaObjetivo: now.subtract(const Duration(days: 14)),
         fechaCreacion: now.subtract(const Duration(days: 60)),
         fechaActualizacion: now.subtract(const Duration(days: 14)),
         ticketsCount: 1,
@@ -519,6 +525,86 @@ class MockDataStore {
         estadoAnterior: 'nuevo',
         estadoNuevo: 'esperando',
       ),
+      ProductividadEvento(
+        fecha: now.subtract(const Duration(days: 3)),
+        usuarioId: 10,
+        usuarioNombre: 'Carlos López',
+        tipo: 'ticket',
+        refId: 1,
+        titulo: 'Error al escanear cajas de traslado',
+        estadoAnterior: '',
+        estadoNuevo: 'nuevo',
+      ),
+      ProductividadEvento(
+        fecha: now.subtract(const Duration(days: 20)),
+        usuarioId: 3,
+        usuarioNombre: 'Jeshua Cabanillas',
+        tipo: 'proyecto',
+        refId: 1,
+        titulo: 'App de Cajas de traslado',
+        estadoAnterior: '',
+        estadoNuevo: 'idea',
+      ),
+      ProductividadEvento(
+        fecha: now.subtract(const Duration(days: 18)),
+        usuarioId: 3,
+        usuarioNombre: 'Jeshua Cabanillas',
+        tipo: 'proyecto',
+        refId: 1,
+        titulo: 'App de Cajas de traslado',
+        estadoAnterior: 'idea',
+        estadoNuevo: 'planificado',
+      ),
+      ProductividadEvento(
+        fecha: now.subtract(const Duration(days: 16)),
+        usuarioId: 3,
+        usuarioNombre: 'Jeshua Cabanillas',
+        tipo: 'proyecto',
+        refId: 1,
+        titulo: 'App de Cajas de traslado',
+        estadoAnterior: 'planificado',
+        estadoNuevo: 'en_proceso',
+      ),
+      ProductividadEvento(
+        fecha: now.subtract(const Duration(days: 7)),
+        usuarioId: 3,
+        usuarioNombre: 'Jeshua Cabanillas',
+        tipo: 'proyecto',
+        refId: 2,
+        titulo: 'Mejoras módulo Cotizaciones',
+        estadoAnterior: '',
+        estadoNuevo: 'idea',
+      ),
+      ProductividadEvento(
+        fecha: now.subtract(const Duration(days: 60)),
+        usuarioId: 3,
+        usuarioNombre: 'Jeshua Cabanillas',
+        tipo: 'proyecto',
+        refId: 3,
+        titulo: 'Portal vacaciones v2',
+        estadoAnterior: '',
+        estadoNuevo: 'idea',
+      ),
+      ProductividadEvento(
+        fecha: now.subtract(const Duration(days: 50)),
+        usuarioId: 3,
+        usuarioNombre: 'Jeshua Cabanillas',
+        tipo: 'proyecto',
+        refId: 3,
+        titulo: 'Portal vacaciones v2',
+        estadoAnterior: 'idea',
+        estadoNuevo: 'en_proceso',
+      ),
+      ProductividadEvento(
+        fecha: now.subtract(const Duration(days: 14)),
+        usuarioId: 12,
+        usuarioNombre: 'Jairo Mendoza',
+        tipo: 'proyecto',
+        refId: 3,
+        titulo: 'Portal vacaciones v2',
+        estadoAnterior: 'en_proceso',
+        estadoNuevo: 'completado',
+      ),
     ]);
   }
 
@@ -656,6 +742,15 @@ class MockDataStore {
       adjuntos: adjuntos,
     );
     tickets.insert(0, t);
+    _recordHistorial(
+      tipo: 'ticket',
+      refId: t.id,
+      titulo: t.titulo,
+      estadoAnterior: '',
+      estadoNuevo: t.estado,
+      usuarioId: userId,
+      usuarioNombre: userName,
+    );
     return t;
   }
 
@@ -684,7 +779,13 @@ class MockDataStore {
     return null;
   }
 
-  Ticket updateTicket(int id, Map<String, dynamic> body, {String? assignName}) {
+  Ticket updateTicket(
+    int id,
+    Map<String, dynamic> body, {
+    String? assignName,
+    int? actorId,
+    String? actorName,
+  }) {
     final i = tickets.indexWhere((t) => t.id == id);
     if (i < 0) throw StateError('Ticket $id no encontrado');
     final cur = tickets[i];
@@ -721,6 +822,17 @@ class MockDataStore {
           : cur.adjuntos,
     );
     tickets[i] = updated;
+    if (cur.estado != updated.estado) {
+      _recordHistorial(
+        tipo: 'ticket',
+        refId: updated.id,
+        titulo: updated.titulo,
+        estadoAnterior: cur.estado,
+        estadoNuevo: updated.estado,
+        usuarioId: actorId ?? updated.asignadoAId,
+        usuarioNombre: actorName ?? assignName ?? updated.asignadoANombre,
+      );
+    }
     return updated;
   }
 
@@ -737,6 +849,8 @@ class MockDataStore {
         if (cur.estado == 'nuevo') 'estado': 'en_proceso',
       },
       assignName: userName,
+      actorId: userId,
+      actorName: userName,
     );
   }
 
@@ -823,14 +937,30 @@ class MockDataStore {
       responsableId: (body['responsable'] as int?) ?? userId,
       responsableNombre: userName,
       creadoPorId: userId,
+      fechaInicio: _parseDate(body['fecha_inicio']),
+      fechaObjetivo: _parseDate(body['fecha_objetivo']),
       fechaCreacion: DateTime.now(),
       fechaActualizacion: DateTime.now(),
     );
     proyectos.insert(0, p);
+    _recordHistorial(
+      tipo: 'proyecto',
+      refId: p.id,
+      titulo: p.titulo,
+      estadoAnterior: '',
+      estadoNuevo: p.estado,
+      usuarioId: userId,
+      usuarioNombre: userName,
+    );
     return p;
   }
 
-  Proyecto updateProyecto(int id, Map<String, dynamic> body) {
+  Proyecto updateProyecto(
+    int id,
+    Map<String, dynamic> body, {
+    int? actorId,
+    String? actorName,
+  }) {
     final i = proyectos.indexWhere((p) => p.id == id);
     if (i < 0) throw StateError('Proyecto $id no encontrado');
     final cur = proyectos[i];
@@ -844,7 +974,10 @@ class MockDataStore {
       responsableId: body.containsKey('responsable') ? body['responsable'] as int? : cur.responsableId,
       responsableNombre: cur.responsableNombre,
       creadoPorId: cur.creadoPorId,
-      fechaObjetivo: cur.fechaObjetivo,
+      fechaInicio: body.containsKey('fecha_inicio') ? _parseDate(body['fecha_inicio']) : cur.fechaInicio,
+      fechaObjetivo: body.containsKey('fecha_objetivo')
+          ? _parseDate(body['fecha_objetivo'])
+          : cur.fechaObjetivo,
       fechaCreacion: cur.fechaCreacion,
       fechaActualizacion: DateTime.now(),
       ticketsCount: tickets.where((t) => t.proyectoId == id).length,
@@ -853,6 +986,17 @@ class MockDataStore {
           : cur.adjuntos,
     );
     proyectos[i] = updated;
+    if (cur.estado != updated.estado) {
+      _recordHistorial(
+        tipo: 'proyecto',
+        refId: updated.id,
+        titulo: updated.titulo,
+        estadoAnterior: cur.estado,
+        estadoNuevo: updated.estado,
+        usuarioId: actorId,
+        usuarioNombre: actorName,
+      );
+    }
     return updated;
   }
 
@@ -873,6 +1017,31 @@ class MockDataStore {
     );
     comentarios.add(c);
     return c;
+  }
+
+  List<HistorialEstado> listHistorial(String tipo, int refId) {
+    final items = historial.where((e) => e.tipo == tipo && e.refId == refId).toList()
+      ..sort((a, b) => a.fecha.compareTo(b.fecha));
+    return [
+      for (var i = 0; i < items.length; i++)
+        HistorialEstado(
+          id: i + 1,
+          tipo: items[i].tipo,
+          refId: items[i].refId,
+          estadoAnterior: items[i].estadoAnterior,
+          estadoNuevo: items[i].estadoNuevo,
+          usuarioId: items[i].usuarioId,
+          usuarioNombre: items[i].usuarioNombre,
+          fecha: items[i].fecha,
+        ),
+    ];
+  }
+
+  DateTime? _parseDate(dynamic raw) {
+    if (raw == null) return null;
+    if (raw is DateTime) return raw;
+    if (raw is String && raw.isNotEmpty) return DateTime.tryParse(raw);
+    return null;
   }
 
   // ── Tareas ────────────────────────────────────────────────────────────
@@ -984,7 +1153,10 @@ class MockDataStore {
     final end = DateTime(hasta.year, hasta.month, hasta.day).add(const Duration(days: 1));
 
     final raw = historial
-        .where((e) => !e.fecha.isBefore(start) && e.fecha.isBefore(end))
+        .where((e) =>
+            (e.tipo == 'ticket' || e.tipo == 'tarea') &&
+            !e.fecha.isBefore(start) &&
+            e.fecha.isBefore(end))
         .toList()
       ..sort((a, b) => b.fecha.compareTo(a.fecha));
 

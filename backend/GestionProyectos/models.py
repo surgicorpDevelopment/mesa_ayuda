@@ -97,7 +97,12 @@ class GP_Proyecto(models.Model):
         blank=True,
         related_name='gp_proyectos_creados',
     )
-    fecha_objetivo = models.DateField(null=True, blank=True)
+    fecha_inicio = models.DateField(null=True, blank=True)
+    fecha_objetivo = models.DateField(
+        null=True,
+        blank=True,
+        help_text='Fecha fin planificada del proyecto',
+    )
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)
 

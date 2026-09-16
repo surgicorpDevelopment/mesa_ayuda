@@ -9,17 +9,9 @@ import '../providers/auth_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../theme/app_typography.dart';
+import '../utils/date_format.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/ui/ui.dart';
-
-String _relative(DateTime? dt) {
-  if (dt == null) return '—';
-  final diff = DateTime.now().difference(dt);
-  if (diff.inMinutes < 60) return 'hace ${diff.inMinutes} min';
-  if (diff.inHours < 24) return 'hace ${diff.inHours} h';
-  if (diff.inDays < 7) return 'hace ${diff.inDays} d';
-  return '${dt.day}/${dt.month}/${dt.year}';
-}
 
 class TicketsListPage extends StatefulWidget {
   const TicketsListPage({
@@ -281,7 +273,7 @@ class _TicketsListPageState extends State<TicketsListPage> {
                                       SizedBox(
                                         width: 88,
                                         child: Text(
-                                          _relative(t.fechaActualizacion),
+                                          formatRelative(t.fechaCreacion),
                                           textAlign: TextAlign.right,
                                           style: AppTypography.textTheme.bodySmall,
                                         ),
@@ -457,7 +449,7 @@ class _TicketFormPageState extends State<TicketFormPage> {
                       )
                     else
                       DropdownButtonFormField<String>(
-                        value: _sistema,
+                        initialValue: _sistema,
                         decoration: const InputDecoration(
                           hintText: 'Selecciona una aplicación o sistema',
                           prefixIcon: Icon(Icons.desktop_windows_outlined),
@@ -492,7 +484,7 @@ class _TicketFormPageState extends State<TicketFormPage> {
                         children: [
                           Expanded(
                             child: DropdownButtonFormField<String>(
-                              value: _prioridad,
+                              initialValue: _prioridad,
                               decoration: const InputDecoration(labelText: 'Prioridad'),
                               items: const [
                                 DropdownMenuItem(value: 'alta', child: Text('Alta')),
@@ -505,7 +497,7 @@ class _TicketFormPageState extends State<TicketFormPage> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: DropdownButtonFormField<String>(
-                              value: _impacto,
+                              initialValue: _impacto,
                               decoration: const InputDecoration(labelText: 'Impacto'),
                               items: const [
                                 DropdownMenuItem(value: 'alta', child: Text('Alta')),
@@ -561,6 +553,8 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
   List<AssignableUser> _assignees = [];
   bool _loadingAssignees = false;
   bool _savingAdjunto = false;
+  List<HistorialEstado> _historial = [];
+  bool _loadingHistorial = false;
 
   @override
   void initState() {
@@ -583,6 +577,7 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
         });
       }
       _loadAssignees();
+      _loadHistorial();
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -610,6 +605,22 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
     }
   }
 
+  Future<void> _loadHistorial() async {
+    if (!mounted) return;
+    setState(() => _loadingHistorial = true);
+    try {
+      final list = await context.read<AuthProvider>().api.fetchHistorial('ticket', widget.id);
+      if (mounted) {
+        setState(() {
+          _historial = list;
+          _loadingHistorial = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingHistorial = false);
+    }
+  }
+
   List<AssignableUser> get _dropdownUsers {
     final list = List<AssignableUser>.from(_assignees);
     final t = _ticket;
@@ -629,6 +640,7 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
     try {
       final t = await context.read<AuthProvider>().api.updateTicket(widget.id, body);
       if (mounted) setState(() => _ticket = t);
+      if (body.containsKey('estado')) await _loadHistorial();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
@@ -676,6 +688,7 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
           const SnackBar(content: Text('Ticket tomado')),
         );
       }
+      await _loadHistorial();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
@@ -714,7 +727,7 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
                                 if (_ticket!.sistemaAfectado.isNotEmpty)
                                   StatusBadge(
                                     label: SistemaAfectadoCatalog.labelFor(_ticket!.sistemaAfectado),
-                                    color: AppColors.navy700,
+                                    color: AppColors.brand600,
                                     softColor: AppColors.slate100,
                                     showDot: false,
                                   ),
@@ -733,7 +746,10 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
                               saving: _savingAdjunto,
                             ),
                             const SizedBox(height: 16),
-                            Text('Actualizado ${_relative(_ticket!.fechaActualizacion)}', style: AppTypography.textTheme.bodySmall),
+                            Text(
+                              'Actualizado ${formatRelative(_ticket!.fechaActualizacion, empty: '')}'.trim(),
+                              style: AppTypography.textTheme.bodySmall,
+                            ),
                           ],
                         ),
                       ),
@@ -746,6 +762,13 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
                           onSubmit: (c) => context.read<AuthProvider>().api.createComentario('ticket', widget.id, c),
                         ),
                       ),
+                      const SizedBox(height: 16),
+                      AppCard(
+                        child: HistorialPanel(
+                          items: _historial,
+                          loading: _loadingHistorial,
+                        ),
+                      ),
                     ];
 
                     final side = AppCard(
@@ -756,6 +779,10 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
                           Text('Detalles', style: AppTypography.textTheme.titleMedium),
                           const SizedBox(height: 14),
                           _DetailRow('Reportado por', _ticket!.reportadoPorNombre ?? '—'),
+                          _DetailRow('Creado', formatDateTimeShort(_ticket!.fechaCreacion)),
+                          _DetailRow('Atendido', formatDateTimeShort(historialHito(_historial, 'en_proceso'))),
+                          _DetailRow('Resuelto', formatDateTimeShort(historialHito(_historial, 'resuelto'))),
+                          _DetailRow('Cerrado', formatDateTimeShort(historialHito(_historial, 'cerrado'))),
                           if (_ticket!.proyectoTitulo != null) _DetailRow('Proyecto', _ticket!.proyectoTitulo!),
                           if (!canManage) _DetailRow('Impacto', labelPrioridad(_ticket!.impacto)),
                           if (canManage) ...[
@@ -773,7 +800,8 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
                               )
                             else
                               DropdownButtonFormField<int?>(
-                                value: _ticket!.asignadoAId,
+                                key: ValueKey(_ticket!.asignadoAId),
+                                initialValue: _ticket!.asignadoAId,
                                 isExpanded: true,
                                 decoration: const InputDecoration(
                                   hintText: 'Sin asignar',
@@ -873,8 +901,8 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
                                         ColorChip(
                                           label: labelPrioridad(p),
                                           selected: _ticket!.impacto == p,
-                                          color: prioridadColor(p),
-                                          softColor: prioridadSoft(p),
+                                          color: impactoColor(p),
+                                          softColor: impactoSoft(p),
                                           onTap: () => _patch({'impacto': p}),
                                         ),
                                         const SizedBox(height: 6),

@@ -1,3 +1,5 @@
+import os
+
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
@@ -51,6 +53,34 @@ from .serializers import (
 
 User = get_user_model()
 
+_ALLOWED_ATTACHMENT_EXTS = {
+    '.png',
+    '.jpg',
+    '.jpeg',
+    '.gif',
+    '.webp',
+    '.bmp',
+    '.pdf',
+    '.doc',
+    '.docx',
+}
+
+
+def _reject_if_invalid_adjunto(archivo):
+    name = archivo.name or ''
+    ext = os.path.splitext(name)[1].lower()
+    if ext not in _ALLOWED_ATTACHMENT_EXTS:
+        return Response(
+            {
+                'detail': (
+                    'Tipo de archivo no permitido. '
+                    'Usa imágenes (PNG, JPG), PDF o Word (DOC, DOCX).'
+                )
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    return None
+
 
 def _scoped_generic(qs, user):
     """Filtra una tabla genérica (tipo, ref_id) por las entidades que el usuario puede ver."""
@@ -94,7 +124,10 @@ class GP_ProyectoViewSet(viewsets.ModelViewSet):
         return visible_proyectos(self.request.user)
 
     def perform_create(self, serializer):
-        serializer.save(creado_por=self.request.user)
+        obj = serializer.save(creado_por=self.request.user)
+        _record_estado_change(
+            TipoEntidad.PROYECTO, obj.id, '', obj.estado, self.request.user
+        )
 
     def perform_update(self, serializer):
         instance = self.get_object()
@@ -117,6 +150,9 @@ class GP_ProyectoViewSet(viewsets.ModelViewSet):
         archivo = request.FILES.get('archivo')
         if not archivo:
             return Response({'detail': 'Se requiere el campo "archivo".'}, status=status.HTTP_400_BAD_REQUEST)
+        rejected = _reject_if_invalid_adjunto(archivo)
+        if rejected is not None:
+            return rejected
         adj = GP_ProyectoAdjunto.objects.create(
             proyecto=proyecto,
             nombre=archivo.name,
@@ -260,6 +296,9 @@ class GP_TicketViewSet(viewsets.ModelViewSet):
         archivo = request.FILES.get('archivo')
         if not archivo:
             return Response({'detail': 'Se requiere el campo "archivo".'}, status=status.HTTP_400_BAD_REQUEST)
+        rejected = _reject_if_invalid_adjunto(archivo)
+        if rejected is not None:
+            return rejected
         adj = GP_TicketAdjunto.objects.create(
             ticket=ticket,
             nombre=archivo.name,

@@ -8,6 +8,7 @@ class Proyecto {
   final int? responsableId;
   final String? responsableNombre;
   final int? creadoPorId;
+  final DateTime? fechaInicio;
   final DateTime? fechaObjetivo;
   final DateTime? fechaCreacion;
   final DateTime? fechaActualizacion;
@@ -24,12 +25,24 @@ class Proyecto {
     this.responsableId,
     this.responsableNombre,
     this.creadoPorId,
+    this.fechaInicio,
     this.fechaObjetivo,
     this.fechaCreacion,
     this.fechaActualizacion,
     this.ticketsCount = 0,
     this.adjuntos = const [],
   });
+
+  DateTime? get fechaFin => fechaObjetivo;
+
+  bool get atrasado {
+    if (fechaObjetivo == null) return false;
+    if (estado == 'completado' || estado == 'cancelado') return false;
+    final fin = DateTime(fechaObjetivo!.year, fechaObjetivo!.month, fechaObjetivo!.day);
+    final today = DateTime.now();
+    final todayDate = DateTime(today.year, today.month, today.day);
+    return fin.isBefore(todayDate);
+  }
 
   factory Proyecto.fromJson(Map<String, dynamic> json) {
     final resp = json['responsable_detail'];
@@ -52,9 +65,8 @@ class Proyecto {
           ? ((resp['full_name'] ?? resp['username']) as String?)
           : null,
       creadoPorId: json['creado_por'] as int?,
-      fechaObjetivo: json['fecha_objetivo'] != null
-          ? DateTime.tryParse(json['fecha_objetivo'] as String)
-          : null,
+      fechaInicio: _parseDateOnly(json['fecha_inicio']),
+      fechaObjetivo: _parseDateOnly(json['fecha_objetivo']),
       fechaCreacion: json['fecha_creacion'] != null
           ? DateTime.tryParse(json['fecha_creacion'] as String)
           : null,
@@ -73,8 +85,17 @@ class Proyecto {
         'estado': estado,
         'prioridad': prioridad,
         'responsable': responsableId,
+        'fecha_inicio': fechaInicio?.toIso8601String().split('T').first,
         'fecha_objetivo': fechaObjetivo?.toIso8601String().split('T').first,
       };
+}
+
+DateTime? _parseDateOnly(dynamic raw) {
+  if (raw == null) return null;
+  if (raw is! String || raw.isEmpty) return null;
+  final parsed = DateTime.tryParse(raw);
+  if (parsed == null) return null;
+  return DateTime(parsed.year, parsed.month, parsed.day);
 }
 
 class Ticket {
@@ -189,7 +210,7 @@ class TicketAdjunto {
 
   factory TicketAdjunto.fromJson(Map<String, dynamic> json) => TicketAdjunto(
         id: (json['id'] ?? '').toString(),
-        nombre: (json['nombre'] ?? 'captura.png') as String,
+        nombre: (json['nombre'] ?? 'archivo') as String,
         url: (json['url'] ?? '') as String,
         mimeType: json['mime_type'] as String?,
         sizeBytes: (json['size_bytes'] as int?) ?? 0,
@@ -380,6 +401,55 @@ class ProductividadRanking {
         tareasHechas: (json['tareas_hechas'] as int?) ?? 0,
         ticketsResueltos: (json['tickets_resueltos'] as int?) ?? 0,
       );
+}
+
+/// Cambio de estatus de ticket, proyecto o tarea (`GP_HistorialEstado`).
+class HistorialEstado {
+  final int id;
+  final String tipo;
+  final int refId;
+  final String estadoAnterior;
+  final String estadoNuevo;
+  final int? usuarioId;
+  final String? usuarioNombre;
+  final DateTime fecha;
+
+  const HistorialEstado({
+    required this.id,
+    required this.tipo,
+    required this.refId,
+    this.estadoAnterior = '',
+    required this.estadoNuevo,
+    this.usuarioId,
+    this.usuarioNombre,
+    required this.fecha,
+  });
+
+  factory HistorialEstado.fromJson(Map<String, dynamic> json) {
+    final user = json['usuario_detail'];
+    return HistorialEstado(
+      id: json['id'] as int,
+      tipo: (json['tipo'] ?? '') as String,
+      refId: json['ref_id'] as int,
+      estadoAnterior: (json['estado_anterior'] ?? '') as String,
+      estadoNuevo: (json['estado_nuevo'] ?? '') as String,
+      usuarioId: json['usuario'] as int?,
+      usuarioNombre: user is Map
+          ? ((user['full_name'] ?? user['username']) as String?)
+          : json['usuario_nombre'] as String?,
+      fecha: DateTime.tryParse((json['fecha'] ?? '') as String) ?? DateTime.now(),
+    );
+  }
+}
+
+DateTime? historialHito(List<HistorialEstado> items, String estadoNuevo) {
+  DateTime? first;
+  for (final e in items) {
+    if (e.estadoNuevo == estadoNuevo) {
+      if (first == null || e.fecha.isBefore(first)) first = e.fecha;
+    }
+  }
+  return first;
 }
 
 /// Evento del timeline de productividad.
