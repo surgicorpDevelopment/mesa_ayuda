@@ -455,11 +455,12 @@ _ROL_POR_GRUPO = (
 
 
 def _asignables_qs():
-    """Usuarios que pueden recibir tickets o tareas: los de los grupos gp_* más superusers."""
+    """Usuarios asignables / ranking: solo grupos gp_desarrollador, gp_lider_area, gp_gestor.
+    No incluye superusers: una cuenta de servicio (Power Automate, etc.) con is_superuser
+    no debe salir en reportes ni en el dropdown de asignación."""
     return (
         User.objects.filter(
-            Q(groups__name__in=[GROUP_DESARROLLADOR, GROUP_LIDER_AREA, GROUP_GESTOR])
-            | Q(is_superuser=True)
+            groups__name__in=[GROUP_DESARROLLADOR, GROUP_LIDER_AREA, GROUP_GESTOR]
         )
         .distinct()
         .order_by('first_name', 'last_name', 'username')
@@ -487,7 +488,7 @@ class GP_UsuarioViewSet(viewsets.ViewSet):
     """
     Directorio del módulo, para no depender de `/users/` y `/groups/` de ServidorCaminitos.
 
-    GET /GP_Usuario/?q=<texto>  → usuarios asignables (grupos gp_* y superusers)
+    GET /GP_Usuario/?q=<texto>  → usuarios asignables (solo grupos gp_*)
     GET /GP_Usuario/me/         → perfil del usuario autenticado, con sus grupos y rol efectivo
     """
 
