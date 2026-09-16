@@ -83,9 +83,11 @@ if ($code -ne "200") {
     throw "El contenedor no respondio 200 (codigo '$code')."
 }
 
-$assetType = & curl.exe -sI http://localhost:8010/assets/FontManifest.json
-if ($assetType -notmatch "application/json" -and $assetType -notmatch "text/plain") {
-    Write-Host $assetType
+# curl -sI returns string[]; -notmatch on arrays filters lines (truthy) and
+# falsely fails even when Content-Type is application/json. Join first.
+$assetHeaders = (& curl.exe -sI http://localhost:8010/assets/FontManifest.json) -join "`n"
+Write-Host "FontManifest headers:`n$assetHeaders"
+if ($assetHeaders -notmatch "(?i)Content-Type:\s*(application/json|text/plain)") {
     throw "FontManifest.json no se sirvio como archivo (IIS/nginx devolvio HTML)."
 }
 
