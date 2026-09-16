@@ -1,12 +1,14 @@
-# Actualiza el frontend Mesa de Ayuda en el servidor (rápido).
+# Actualiza el frontend Mesa de Ayuda en el servidor (rapido).
 #
-# Flujo: git pull → flutter build (host) → imagen nginx → recrear contenedor :8010
+# Flujo: git pull -> flutter build (host) -> imagen nginx -> recrear contenedor :8010
 #
 # Uso:
 #   cd "C:\Users\srvcaminitos\Documents\Gestor de Proyecto - Tickets"
 #   .\deploy\update-frontend.ps1
 #
 # Requiere: Flutter en PATH, git, Docker Engine.
+# Este archivo es ASCII a proposito: PowerShell 5.1 del servidor
+# no parsea bien UTF-8 sin BOM (el em-dash se vuelve un quote y rompe el script).
 
 $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent $PSScriptRoot
@@ -14,7 +16,7 @@ Set-Location $RepoRoot
 
 function Assert-Command($Name) {
     if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) {
-        throw "No se encontró '$Name' en PATH. Instálalo o abre una sesión nueva tras instalarlo."
+        throw "No se encontro '$Name' en PATH. Instalalo o abre una sesion nueva tras instalarlo."
     }
 }
 
@@ -32,7 +34,7 @@ Write-Host "==> flutter build web (host)" -ForegroundColor Cyan
 flutter build web --release --base-href /app_mesaayuda/
 
 if (-not (Test-Path "build\web\index.html")) {
-    throw "No existe build\web\index.html — el build de Flutter falló."
+    throw "No existe build\web\index.html - el build de Flutter fallo."
 }
 
 Write-Host "==> docker build (nginx, segundos)" -ForegroundColor Cyan
@@ -50,6 +52,6 @@ Start-Sleep -Seconds 1
 $code = & curl.exe -s -o NUL -w "%{http_code}" http://localhost:8010/
 Write-Host "HTTP $code"
 if ($code -ne "200") {
-    throw "El contenedor no respondió 200 (código '$code')."
+    throw "El contenedor no respondio 200 (codigo '$code')."
 }
 Write-Host "Listo. Abre https://appsurgicorperu.com/app_mesaayuda/" -ForegroundColor Green
