@@ -8,6 +8,8 @@ const kAllowedAttachmentExtensions = [
   'pdf',
   'doc',
   'docx',
+  'xls',
+  'xlsx',
 ];
 
 const kMaxAttachmentBytes = 30 * 1024 * 1024;
@@ -22,6 +24,10 @@ String mimeFromFileName(String name) {
   if (lower.endsWith('.doc')) return 'application/msword';
   if (lower.endsWith('.docx')) {
     return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  }
+  if (lower.endsWith('.xls')) return 'application/vnd.ms-excel';
+  if (lower.endsWith('.xlsx')) {
+    return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   }
   if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
   return 'application/octet-stream';
@@ -58,6 +64,22 @@ bool isWordAttachment({String? mimeType, required String nombre}) {
   }
   final n = nombre.toLowerCase();
   return n.endsWith('.doc') || n.endsWith('.docx');
+}
+
+bool isExcelAttachment({String? mimeType, required String nombre}) {
+  final mime = (mimeType ?? '').toLowerCase();
+  if (mime == 'application/vnd.ms-excel' ||
+      mime == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
+    return true;
+  }
+  final n = nombre.toLowerCase();
+  return n.endsWith('.xls') || n.endsWith('.xlsx');
+}
+
+/// Word y Excel: el navegador no los previsualiza; se descargan.
+bool isOfficeDownloadAttachment({String? mimeType, required String nombre}) {
+  return isWordAttachment(mimeType: mimeType, nombre: nombre) ||
+      isExcelAttachment(mimeType: mimeType, nombre: nombre);
 }
 
 String attachmentExtensionLabel(String nombre) {

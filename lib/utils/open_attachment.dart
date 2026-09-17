@@ -30,8 +30,8 @@ Future<bool> openAttachment(TicketAdjunto adjunto) async {
   try {
     final uri = Uri.parse(raw);
     if (uri.scheme != 'http' && uri.scheme != 'https') return false;
-    // Word: forzar descarga; PDF/imágenes: abrir en pestaña.
-    if (isWordAttachment(mimeType: mime, nombre: adjunto.nombre)) {
+    // Word/Excel: forzar descarga; PDF/imágenes: abrir en pestaña.
+    if (isOfficeDownloadAttachment(mimeType: mime, nombre: adjunto.nombre)) {
       return await platform.downloadRemoteFile(
         url: raw,
         mimeType: mime,

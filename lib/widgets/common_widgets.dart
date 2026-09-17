@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../utils/date_format.dart';
+import 'ui/linkified_text.dart';
 import 'ui/section_header.dart';
 import 'ui/status_badge.dart';
 
@@ -138,7 +139,7 @@ class _ComentariosPanelState extends State<ComentariosPanel> {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  SelectableText(cuerpo, style: AppTypography.textTheme.bodyMedium),
+                  LinkifiedText(cuerpo, style: AppTypography.textTheme.bodyMedium),
                 ],
               ),
             );

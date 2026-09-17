@@ -51,7 +51,7 @@ class ScreenshotPicker extends StatelessWidget {
         Text('Adjuntos', style: AppTypography.textTheme.labelMedium),
         const SizedBox(height: 6),
         Text(
-          'Hasta $maxFiles archivos: imágenes (PNG, JPG), PDF o Word (DOC, DOCX).',
+          'Hasta $maxFiles archivos: imágenes, PDF, Word o Excel.',
           style: AppTypography.textTheme.bodySmall,
         ),
         const SizedBox(height: 10),
@@ -87,7 +87,7 @@ class ScreenshotPicker extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'PNG, JPG, PDF, DOC o DOCX',
+                  'PNG, JPG, PDF, Word o Excel',
                   style: AppTypography.textTheme.bodySmall,
                 ),
               ],
@@ -362,21 +362,28 @@ class _DocumentTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final pdf = isPdfAttachment(mimeType: adjunto.mimeType, nombre: adjunto.nombre);
     final word = isWordAttachment(mimeType: adjunto.mimeType, nombre: adjunto.nombre);
+    final excel = isExcelAttachment(mimeType: adjunto.mimeType, nombre: adjunto.nombre);
     final color = pdf
         ? AppColors.danger
-        : word
-            ? AppColors.brand600
-            : AppColors.slate700;
+        : excel
+            ? AppColors.success
+            : word
+                ? AppColors.brand600
+                : AppColors.slate700;
     final bg = pdf
         ? AppColors.dangerSoft
-        : word
-            ? AppColors.brand50
-            : AppColors.slate100;
+        : excel
+            ? AppColors.successSoft
+            : word
+                ? AppColors.brand50
+                : AppColors.slate100;
     final icon = pdf
         ? Icons.picture_as_pdf_outlined
-        : word
-            ? Icons.description_outlined
-            : Icons.insert_drive_file_outlined;
+        : excel
+            ? Icons.table_chart_outlined
+            : word
+                ? Icons.description_outlined
+                : Icons.insert_drive_file_outlined;
 
     return ColoredBox(
       color: bg,
@@ -505,7 +512,7 @@ Future<List<TicketAdjunto>> pickAttachmentFiles(
   if (skippedType) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Algunos archivos no son compatibles (PNG, JPG, PDF o Word).'),
+        content: Text('Algunos archivos no son compatibles (PNG, JPG, PDF, Word o Excel).'),
       ),
     );
   } else if (skippedSize) {

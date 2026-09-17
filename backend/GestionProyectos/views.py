@@ -65,6 +65,8 @@ _ALLOWED_ATTACHMENT_EXTS = {
     '.pdf',
     '.doc',
     '.docx',
+    '.xls',
+    '.xlsx',
 }
 
 
@@ -76,7 +78,7 @@ def _reject_if_invalid_adjunto(archivo):
             {
                 'detail': (
                     'Tipo de archivo no permitido. '
-                    'Usa imágenes (PNG, JPG), PDF o Word (DOC, DOCX).'
+                    'Usa imágenes (PNG, JPG), PDF, Word (DOC, DOCX) o Excel (XLS, XLSX).'
                 )
             },
             status=status.HTTP_400_BAD_REQUEST,
