@@ -73,8 +73,17 @@ class _ProyectosListPageState extends State<ProyectosListPage> {
 
   @override
   Widget build(BuildContext context) {
-    final canCreate = context.watch<AuthProvider>().user?.canManageProyectos == true;
-    final estados = [null, 'idea', 'planificado', 'en_proceso', 'pausado', 'completado', 'cancelado'];
+    final canCreate =
+        context.watch<AuthProvider>().user?.canManageProyectos == true;
+    final estados = [
+      null,
+      'idea',
+      'planificado',
+      'en_proceso',
+      'pausado',
+      'completado',
+      'cancelado',
+    ];
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -92,7 +101,10 @@ class _ProyectosListPageState extends State<ProyectosListPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SectionHeader(title: 'Proyectos', subtitle: '${_items.length} proyectos'),
+                SectionHeader(
+                  title: 'Proyectos',
+                  subtitle: '${_items.length} proyectos',
+                ),
                 const SizedBox(height: 12),
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
@@ -124,124 +136,157 @@ class _ProyectosListPageState extends State<ProyectosListPage> {
               child: _loading
                   ? const AppSkeletonList(count: 3)
                   : _error != null
-                      ? ListView(children: [AppEmptyState(message: _error!, icon: Icons.error_outline)])
-                      : _items.isEmpty
-                          ? ListView(children: const [AppEmptyState(message: 'No hay proyectos')])
-                          : GridView.builder(
-                              padding: const EdgeInsets.fromLTRB(24, 8, 24, 88),
-                              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                                maxCrossAxisExtent: 380,
-                                mainAxisExtent: 268,
-                                crossAxisSpacing: 12,
-                                mainAxisSpacing: 12,
-                              ),
-                              itemCount: _items.length,
-                              itemBuilder: (context, i) {
-                                final p = _items[i];
-                                final progress = _progress(p.id);
-                                final tareaCount = (_tareasByProject[p.id] ?? []).length;
-                                return AppCard(
-                                  hoverable: true,
-                                  onTap: () => context.go('/proyectos/${p.id}'),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: Text(
-                                              p.titulo,
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: AppTypography.textTheme.titleMedium,
-                                            ),
-                                          ),
-                                          StatusBadge.estado(p.estado),
-                                        ],
-                                      ),
-                                      if (p.atrasado) ...[
-                                        const SizedBox(height: 6),
-                                        Align(
-                                          alignment: Alignment.centerLeft,
-                                          child: StatusBadge(
-                                            label: 'Atrasado',
-                                            color: AppColors.danger,
-                                            softColor: AppColors.dangerSoft,
-                                            showDot: false,
-                                          ),
-                                        ),
-                                      ],
-                                      const SizedBox(height: 8),
-                                      Expanded(
-                                        child: Text(
-                                          p.descripcion.isEmpty ? 'Sin descripción' : p.descripcion,
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: AppTypography.textTheme.bodySmall,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      if (p.areaNombre != null && p.areaNombre!.isNotEmpty) ...[
-                                        Row(
-                                          children: [
-                                            Icon(Icons.business_outlined, size: 14, color: AppColors.slate500),
-                                            const SizedBox(width: 4),
-                                            Expanded(
-                                              child: Text(
-                                                p.areaNombre!,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: AppTypography.textTheme.labelSmall?.copyWith(
-                                                  color: AppColors.slate500,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 6),
-                                      ],
-                                      Text(
-                                        formatDateRange(p.fechaInicio, p.fechaFin),
-                                        style: AppTypography.textTheme.labelSmall?.copyWith(
-                                          color: p.atrasado ? AppColors.danger : AppColors.slate500,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Row(
-                                        children: [
-                                          AppAvatar(name: p.responsableNombre ?? '—', size: 26),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              p.responsableNombre ?? 'Sin responsable',
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: AppTypography.textTheme.bodySmall,
-                                            ),
-                                          ),
-                                          Text('$tareaCount tareas', style: AppTypography.textTheme.bodySmall),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 10),
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(6),
-                                        child: LinearProgressIndicator(
-                                          value: progress,
-                                          minHeight: 6,
-                                          backgroundColor: AppColors.slate100,
-                                          color: AppColors.brand600,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        '${(progress * 100).round()}% completado',
-                                        style: AppTypography.textTheme.labelSmall,
-                                      ),
-                                    ],
+                  ? ListView(
+                      children: [
+                        AppEmptyState(
+                          message: _error!,
+                          icon: Icons.error_outline,
+                        ),
+                      ],
+                    )
+                  : _items.isEmpty
+                  ? ListView(
+                      children: const [
+                        AppEmptyState(message: 'No hay proyectos'),
+                      ],
+                    )
+                  : GridView.builder(
+                      padding: const EdgeInsets.fromLTRB(24, 8, 24, 88),
+                      gridDelegate:
+                          const SliverGridDelegateWithMaxCrossAxisExtent(
+                            maxCrossAxisExtent: 380,
+                            mainAxisExtent: 268,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
+                          ),
+                      itemCount: _items.length,
+                      itemBuilder: (context, i) {
+                        final p = _items[i];
+                        final progress = _progress(p.id);
+                        final tareaCount =
+                            (_tareasByProject[p.id] ?? []).length;
+                        return AppCard(
+                          hoverable: true,
+                          onTap: () => context.go('/proyectos/${p.id}'),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      p.titulo,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style:
+                                          AppTypography.textTheme.titleMedium,
+                                    ),
                                   ),
-                                ).animate().fadeIn(delay: (30 * i).ms);
-                              },
-                            ),
+                                  StatusBadge.estado(p.estado),
+                                ],
+                              ),
+                              if (p.atrasado) ...[
+                                const SizedBox(height: 6),
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: StatusBadge(
+                                    label: 'Atrasado',
+                                    color: AppColors.danger,
+                                    softColor: AppColors.dangerSoft,
+                                    showDot: false,
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(height: 8),
+                              Expanded(
+                                child: Text(
+                                  p.descripcion.isEmpty
+                                      ? 'Sin descripción'
+                                      : p.descripcion,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppTypography.textTheme.bodySmall,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              if (p.areaNombre != null &&
+                                  p.areaNombre!.isNotEmpty) ...[
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.business_outlined,
+                                      size: 14,
+                                      color: AppColors.slate500,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Expanded(
+                                      child: Text(
+                                        p.areaNombre!,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: AppTypography
+                                            .textTheme
+                                            .labelSmall
+                                            ?.copyWith(
+                                              color: AppColors.slate500,
+                                            ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                              ],
+                              Text(
+                                formatDateRange(p.fechaInicio, p.fechaFin),
+                                style: AppTypography.textTheme.labelSmall
+                                    ?.copyWith(
+                                      color: p.atrasado
+                                          ? AppColors.danger
+                                          : AppColors.slate500,
+                                    ),
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  AppAvatar(
+                                    name: p.responsableNombre ?? '—',
+                                    size: 26,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      p.responsableNombre ?? 'Sin responsable',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: AppTypography.textTheme.bodySmall,
+                                    ),
+                                  ),
+                                  Text(
+                                    '$tareaCount tareas',
+                                    style: AppTypography.textTheme.bodySmall,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(6),
+                                child: LinearProgressIndicator(
+                                  value: progress,
+                                  minHeight: 6,
+                                  backgroundColor: AppColors.slate100,
+                                  color: AppColors.brand600,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${(progress * 100).round()}% completado',
+                                style: AppTypography.textTheme.labelSmall,
+                              ),
+                            ],
+                          ),
+                        ).animate().fadeIn(delay: (30 * i).ms);
+                      },
+                    ),
             ),
           ),
         ],
@@ -286,7 +331,11 @@ class _ProyectoFormPageState extends State<ProyectoFormPage> {
     setState(() => _loadingAreas = true);
     try {
       final list = await context.read<AuthProvider>().api.fetchAreas();
-      if (mounted) setState(() { _areas = list; _loadingAreas = false; });
+      if (mounted)
+        setState(() {
+          _areas = list;
+          _loadingAreas = false;
+        });
     } catch (_) {
       if (mounted) setState(() => _loadingAreas = false);
     }
@@ -295,7 +344,10 @@ class _ProyectoFormPageState extends State<ProyectoFormPage> {
   Future<void> _loadResponsables() async {
     setState(() => _loadingResponsables = true);
     try {
-      final list = await context.read<AuthProvider>().api.fetchAssignableUsers();
+      final list = await context
+          .read<AuthProvider>()
+          .api
+          .fetchAssignableUsers();
       if (!mounted) return;
       setState(() {
         _responsables = list;
@@ -304,7 +356,11 @@ class _ProyectoFormPageState extends State<ProyectoFormPage> {
         final me = context.read<AuthProvider>().user;
         if (me != null && !_responsables.any((u) => u.id == me.id)) {
           _responsables = [
-            AssignableUser(id: me.id, fullName: me.fullName, username: me.username),
+            AssignableUser(
+              id: me.id,
+              fullName: me.fullName,
+              username: me.username,
+            ),
             ..._responsables,
           ];
         }
@@ -325,10 +381,19 @@ class _ProyectoFormPageState extends State<ProyectoFormPage> {
     if (_titulo.text.trim().isEmpty) return;
     if (_fechaInicio != null &&
         _fechaFin != null &&
-        DateTime(_fechaInicio!.year, _fechaInicio!.month, _fechaInicio!.day)
-            .isAfter(DateTime(_fechaFin!.year, _fechaFin!.month, _fechaFin!.day))) {
+        DateTime(
+          _fechaInicio!.year,
+          _fechaInicio!.month,
+          _fechaInicio!.day,
+        ).isAfter(
+          DateTime(_fechaFin!.year, _fechaFin!.month, _fechaFin!.day),
+        )) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('La fecha de inicio no puede ser posterior a la fecha fin.')),
+        const SnackBar(
+          content: Text(
+            'La fecha de inicio no puede ser posterior a la fecha fin.',
+          ),
+        ),
       );
       return;
     }
@@ -362,7 +427,10 @@ class _ProyectoFormPageState extends State<ProyectoFormPage> {
       backgroundColor: AppColors.bg,
       appBar: AppBar(
         title: const Text('Nuevo proyecto'),
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.go('/proyectos')),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.go('/proyectos'),
+        ),
       ),
       body: Center(
         child: ConstrainedBox(
@@ -376,7 +444,12 @@ class _ProyectoFormPageState extends State<ProyectoFormPage> {
                   children: [
                     AppTextField(controller: _titulo, label: 'Título'),
                     const SizedBox(height: 14),
-                    AppTextField(controller: _desc, label: 'Descripción', minLines: 4, maxLines: 8),
+                    AppTextField(
+                      controller: _desc,
+                      label: 'Descripción',
+                      minLines: 4,
+                      maxLines: 8,
+                    ),
                     // Selector de área solo para gestores/líderes
                     if (isLider) ...[
                       const SizedBox(height: 14),
@@ -393,9 +466,15 @@ class _ProyectoFormPageState extends State<ProyectoFormPage> {
                             prefixIcon: Icon(Icons.business_outlined),
                           ),
                           items: [
-                            const DropdownMenuItem<int?>(value: null, child: Text('Sin área')),
+                            const DropdownMenuItem<int?>(
+                              value: null,
+                              child: Text('Sin área'),
+                            ),
                             for (final a in _areas)
-                              DropdownMenuItem<int?>(value: a.id, child: Text(a.nombre)),
+                              DropdownMenuItem<int?>(
+                                value: a.id,
+                                child: Text(a.nombre),
+                              ),
                           ],
                           onChanged: (v) => setState(() => _areaId = v),
                         ),
@@ -406,8 +485,14 @@ class _ProyectoFormPageState extends State<ProyectoFormPage> {
                       decoration: const InputDecoration(labelText: 'Estado'),
                       items: const [
                         DropdownMenuItem(value: 'idea', child: Text('En Idea')),
-                        DropdownMenuItem(value: 'planificado', child: Text('Planificado')),
-                        DropdownMenuItem(value: 'en_proceso', child: Text('En Proceso')),
+                        DropdownMenuItem(
+                          value: 'planificado',
+                          child: Text('Planificado'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'en_proceso',
+                          child: Text('En Proceso'),
+                        ),
                       ],
                       onChanged: (v) => setState(() => _estado = v ?? 'idea'),
                     ),
@@ -420,7 +505,8 @@ class _ProyectoFormPageState extends State<ProyectoFormPage> {
                         DropdownMenuItem(value: 'media', child: Text('Media')),
                         DropdownMenuItem(value: 'baja', child: Text('Baja')),
                       ],
-                      onChanged: (v) => setState(() => _prioridad = v ?? 'media'),
+                      onChanged: (v) =>
+                          setState(() => _prioridad = v ?? 'media'),
                     ),
                     const SizedBox(height: 14),
                     if (_loadingResponsables)
@@ -445,7 +531,10 @@ class _ProyectoFormPageState extends State<ProyectoFormPage> {
                           for (final u in _responsables)
                             DropdownMenuItem<int?>(
                               value: u.id,
-                              child: Text(u.fullName, overflow: TextOverflow.ellipsis),
+                              child: Text(
+                                u.fullName,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                         ],
                         onChanged: (v) => setState(() => _responsableId = v),
@@ -471,7 +560,12 @@ class _ProyectoFormPageState extends State<ProyectoFormPage> {
                       ],
                     ),
                     const SizedBox(height: 24),
-                    AppButton(label: 'Crear proyecto', loading: _saving, onPressed: _saving ? null : _save, expanded: true),
+                    AppButton(
+                      label: 'Crear proyecto',
+                      loading: _saving,
+                      onPressed: _saving ? null : _save,
+                      expanded: true,
+                    ),
                   ],
                 ),
               ),
@@ -539,7 +633,8 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
     });
     try {
       final api = context.read<AuthProvider>().api;
-      final canManage = context.read<AuthProvider>().user?.canManageProyectos == true;
+      final canManage =
+          context.read<AuthProvider>().user?.canManageProyectos == true;
       final futures = <Future>[
         api.fetchProyecto(widget.id),
         api.fetchTareas(proyectoId: widget.id),
@@ -574,7 +669,10 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
     if (!mounted) return;
     setState(() => _loadingHistorial = true);
     try {
-      final list = await context.read<AuthProvider>().api.fetchHistorial('proyecto', widget.id);
+      final list = await context.read<AuthProvider>().api.fetchHistorial(
+        'proyecto',
+        widget.id,
+      );
       if (mounted) {
         setState(() {
           _historial = list;
@@ -616,7 +714,10 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
 
   Future<void> _setEstado(String estado) async {
     try {
-      final p = await context.read<AuthProvider>().api.updateProyecto(widget.id, {'estado': estado});
+      final p = await context.read<AuthProvider>().api.updateProyecto(
+        widget.id,
+        {'estado': estado},
+      );
       if (mounted) setState(() => _proyecto = p);
       await _loadHistorial();
     } catch (e) {
@@ -627,9 +728,10 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
 
   Future<void> _setResponsable(int? responsableId) async {
     try {
-      final p = await context.read<AuthProvider>().api.updateProyecto(widget.id, {
-        'responsable': responsableId,
-      });
+      final p = await context.read<AuthProvider>().api.updateProyecto(
+        widget.id,
+        {'responsable': responsableId},
+      );
       if (mounted) setState(() => _proyecto = p);
     } catch (e) {
       if (!mounted) return;
@@ -639,9 +741,10 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
 
   Future<void> _setArea(int? areaId) async {
     try {
-      final p = await context.read<AuthProvider>().api.updateProyecto(widget.id, {
-        'area_id': areaId,
-      });
+      final p = await context.read<AuthProvider>().api.updateProyecto(
+        widget.id,
+        {'area_id': areaId},
+      );
       if (mounted) setState(() => _proyecto = p);
     } catch (e) {
       if (!mounted) return;
@@ -672,19 +775,18 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
     }
     setState(() => _savingTexto = true);
     try {
-      final p = await context.read<AuthProvider>().api.updateProyecto(widget.id, {
-        'titulo': titulo,
-        'descripcion': _desc.text.trim(),
-      });
+      final p = await context.read<AuthProvider>().api.updateProyecto(
+        widget.id,
+        {'titulo': titulo, 'descripcion': _desc.text.trim()},
+      );
       if (!mounted) return;
       setState(() {
         _proyecto = p;
         _editingTexto = false;
       });
       _syncTextoFromProyecto(p);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Proyecto actualizado')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Proyecto actualizado')));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
@@ -696,19 +798,29 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
   Future<void> _setFechas({DateTime? inicio, DateTime? fin}) async {
     if (inicio != null &&
         fin != null &&
-        DateTime(inicio.year, inicio.month, inicio.day)
-            .isAfter(DateTime(fin.year, fin.month, fin.day))) {
+        DateTime(
+          inicio.year,
+          inicio.month,
+          inicio.day,
+        ).isAfter(DateTime(fin.year, fin.month, fin.day))) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('La fecha de inicio no puede ser posterior a la fecha fin.')),
+        const SnackBar(
+          content: Text(
+            'La fecha de inicio no puede ser posterior a la fecha fin.',
+          ),
+        ),
       );
       return;
     }
     try {
-      final p = await context.read<AuthProvider>().api.updateProyecto(widget.id, {
-        'fecha_inicio': inicio?.toIso8601String().split('T').first,
-        'fecha_objetivo': fin?.toIso8601String().split('T').first,
-      });
+      final p = await context.read<AuthProvider>().api.updateProyecto(
+        widget.id,
+        {
+          'fecha_inicio': inicio?.toIso8601String().split('T').first,
+          'fecha_objetivo': fin?.toIso8601String().split('T').first,
+        },
+      );
       if (mounted) setState(() => _proyecto = p);
     } catch (e) {
       if (!mounted) return;
@@ -738,7 +850,10 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
     if (_savingAdjunto) return;
     setState(() => _savingAdjunto = true);
     try {
-      final updated = await context.read<AuthProvider>().api.removeProyectoAdjunto(widget.id, adj.id);
+      final updated = await context
+          .read<AuthProvider>()
+          .api
+          .removeProyectoAdjunto(widget.id, adj.id);
       if (mounted) setState(() => _proyecto = updated);
     } catch (e) {
       if (!mounted) return;
@@ -770,7 +885,10 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
       }
     });
     try {
-      final updated = await context.read<AuthProvider>().api.updateTarea(tarea.id, {'estado': nuevoEstado});
+      final updated = await context.read<AuthProvider>().api.updateTarea(
+        tarea.id,
+        {'estado': nuevoEstado},
+      );
       if (mounted) {
         setState(() {
           final i = _tareas.indexWhere((t) => t.id == updated.id);
@@ -784,7 +902,8 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
           final i = _tareas.indexWhere((t) => t.id == tarea.id);
           if (i >= 0) _tareas[i] = tarea;
         });
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('$e')));
       }
     }
   }
@@ -822,7 +941,8 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
       // Restore on failure
       if (mounted) {
         setState(() => _tareas.add(tarea));
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('$e')));
       }
     }
   }
@@ -837,12 +957,15 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
     required List<TareaEspera> esperando,
   }) async {
     try {
-      final updated = await context.read<AuthProvider>().api.updateTarea(tarea.id, {
-        'titulo': titulo,
-        'descripcion': descripcion,
-        'asignado_a': asignadoAId,
-        'esperando': esperando.map((e) => e.toJson()).toList(),
-      });
+      final updated = await context.read<AuthProvider>().api.updateTarea(
+        tarea.id,
+        {
+          'titulo': titulo,
+          'descripcion': descripcion,
+          'asignado_a': asignadoAId,
+          'esperando': esperando.map((e) => e.toJson()).toList(),
+        },
+      );
       if (mounted) {
         setState(() {
           final i = _tareas.indexWhere((t) => t.id == updated.id);
@@ -867,7 +990,10 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
           'Se borrarán comentarios, historial y adjuntos. No se puede deshacer.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: TextButton.styleFrom(foregroundColor: AppColors.danger),
@@ -893,7 +1019,8 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
 
   @override
   Widget build(BuildContext context) {
-    final canManage = context.watch<AuthProvider>().user?.canManageProyectos == true;
+    final canManage =
+        context.watch<AuthProvider>().user?.canManageProyectos == true;
     final canDelete = context.watch<AuthProvider>().user?.isLider == true;
 
     return Scaffold(
@@ -938,14 +1065,14 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
       body: _loading
           ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
           : _error != null
-              ? AppEmptyState(message: _error!, icon: Icons.error_outline)
-              : TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildDetalleTab(canManage, canDelete),
-                    _buildTareasTab(),
-                  ],
-                ),
+          ? AppEmptyState(message: _error!, icon: Icons.error_outline)
+          : TabBarView(
+              controller: _tabController,
+              children: [
+                _buildDetalleTab(canManage, canDelete),
+                _buildTareasTab(),
+              ],
+            ),
     );
   }
 
@@ -1034,10 +1161,17 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
                     prefixIcon: Icon(Icons.business_outlined),
                   ),
                   items: [
-                    const DropdownMenuItem<int?>(value: null, child: Text('Sin área')),
+                    const DropdownMenuItem<int?>(
+                      value: null,
+                      child: Text('Sin área'),
+                    ),
                     for (final a in _areasDistinct)
-                      DropdownMenuItem<int?>(value: a.id, child: Text(a.nombre)),
-                    if (p.areaId != null && !_areasDistinct.any((a) => a.id == p.areaId))
+                      DropdownMenuItem<int?>(
+                        value: a.id,
+                        child: Text(a.nombre),
+                      ),
+                    if (p.areaId != null &&
+                        !_areasDistinct.any((a) => a.id == p.areaId))
                       DropdownMenuItem<int?>(
                         value: p.areaId,
                         child: Text(p.areaNombre ?? 'Área #${p.areaId}'),
@@ -1062,7 +1196,10 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
                     for (final u in _dropdownResponsables)
                       DropdownMenuItem<int?>(
                         value: u.id,
-                        child: Text(u.fullName, overflow: TextOverflow.ellipsis),
+                        child: Text(
+                          u.fullName,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                   ],
                   onChanged: _setResponsable,
@@ -1073,7 +1210,11 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Row(
                       children: [
-                        Icon(Icons.business_outlined, size: 16, color: AppColors.slate500),
+                        Icon(
+                          Icons.business_outlined,
+                          size: 16,
+                          color: AppColors.slate500,
+                        ),
                         const SizedBox(width: 6),
                         Text(
                           p.areaNombre!,
@@ -1101,7 +1242,8 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
                       child: DateField(
                         label: 'Fecha inicio',
                         value: p.fechaInicio,
-                        onChanged: (v) => _setFechas(inicio: v, fin: p.fechaFin),
+                        onChanged: (v) =>
+                            _setFechas(inicio: v, fin: p.fechaFin),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -1109,7 +1251,8 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
                       child: DateField(
                         label: 'Fecha fin',
                         value: p.fechaFin,
-                        onChanged: (v) => _setFechas(inicio: p.fechaInicio, fin: v),
+                        onChanged: (v) =>
+                            _setFechas(inicio: p.fechaInicio, fin: v),
                       ),
                     ),
                   ],
@@ -1136,7 +1279,14 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
                   spacing: 6,
                   runSpacing: 6,
                   children: [
-                    for (final e in ['idea', 'planificado', 'en_proceso', 'pausado', 'completado', 'cancelado'])
+                    for (final e in [
+                      'idea',
+                      'planificado',
+                      'en_proceso',
+                      'pausado',
+                      'completado',
+                      'cancelado',
+                    ])
                       ColorChip(
                         label: labelEstado(e),
                         selected: p.estado == e,
@@ -1155,16 +1305,20 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
           child: ComentariosPanel(
             tipo: 'proyecto',
             refId: widget.id,
-            load: () => context.read<AuthProvider>().api.fetchComentarios('proyecto', widget.id),
-            onSubmit: (c) => context.read<AuthProvider>().api.createComentario('proyecto', widget.id, c),
+            load: () => context.read<AuthProvider>().api.fetchComentarios(
+              'proyecto',
+              widget.id,
+            ),
+            onSubmit: (c) => context.read<AuthProvider>().api.createComentario(
+              'proyecto',
+              widget.id,
+              c,
+            ),
           ),
         ),
         const SizedBox(height: 16),
         AppCard(
-          child: HistorialPanel(
-            items: _historial,
-            loading: _loadingHistorial,
-          ),
+          child: HistorialPanel(items: _historial, loading: _loadingHistorial),
         ),
         if (canDelete) ...[
           const SizedBox(height: 16),

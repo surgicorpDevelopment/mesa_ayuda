@@ -46,36 +46,45 @@ class _HomePageState extends State<HomePage> {
 
       // Desarrollador: tickets abiertos asignados a mí.
       // Usuario final: incidencias que yo reporté y siguen abiertas.
-      final misTickets = tickets.where((t) {
-        final abierto = t.estado != 'resuelto' && t.estado != 'cerrado';
-        if (!abierto) return false;
-        if (isDev && userId != null) return t.asignadoAId == userId;
-        return t.reportadoPorId == userId;
-      }).toList()
-        ..sort((a, b) {
-          final da = a.fechaActualizacion ?? DateTime.fromMillisecondsSinceEpoch(0);
-          final db = b.fechaActualizacion ?? DateTime.fromMillisecondsSinceEpoch(0);
-          return db.compareTo(da);
-        });
+      final misTickets =
+          tickets.where((t) {
+            final abierto = t.estado != 'resuelto' && t.estado != 'cerrado';
+            if (!abierto) return false;
+            if (isDev && userId != null) return t.asignadoAId == userId;
+            return t.reportadoPorId == userId;
+          }).toList()..sort((a, b) {
+            final da =
+                a.fechaActualizacion ?? DateTime.fromMillisecondsSinceEpoch(0);
+            final db =
+                b.fechaActualizacion ?? DateTime.fromMillisecondsSinceEpoch(0);
+            return db.compareTo(da);
+          });
 
       var misTareas = <Tarea>[];
       var titulos = <int, String>{};
       if (isDev && userId != null) {
         final allTareas = await api.fetchTareas();
-        misTareas = allTareas
-            .where((t) =>
-                t.asignadoAId == userId &&
-                (t.estado == 'pendiente' || t.estado == 'en_progreso'))
-            .toList()
-          ..sort((a, b) {
-            if (a.estado != b.estado) {
-              if (a.estado == 'en_progreso') return -1;
-              if (b.estado == 'en_progreso') return 1;
-            }
-            final da = a.fechaActualizacion ?? DateTime.fromMillisecondsSinceEpoch(0);
-            final db = b.fechaActualizacion ?? DateTime.fromMillisecondsSinceEpoch(0);
-            return db.compareTo(da);
-          });
+        misTareas =
+            allTareas
+                .where(
+                  (t) =>
+                      t.asignadoAId == userId &&
+                      (t.estado == 'pendiente' || t.estado == 'en_progreso'),
+                )
+                .toList()
+              ..sort((a, b) {
+                if (a.estado != b.estado) {
+                  if (a.estado == 'en_progreso') return -1;
+                  if (b.estado == 'en_progreso') return 1;
+                }
+                final da =
+                    a.fechaActualizacion ??
+                    DateTime.fromMillisecondsSinceEpoch(0);
+                final db =
+                    b.fechaActualizacion ??
+                    DateTime.fromMillisecondsSinceEpoch(0);
+                return db.compareTo(da);
+              });
         if (misTareas.isNotEmpty) {
           final proyectos = await api.fetchProyectos();
           for (final p in proyectos) {
@@ -111,7 +120,9 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().user;
-    final name = user?.firstName.isNotEmpty == true ? user!.firstName : (user?.username ?? '');
+    final name = user?.firstName.isNotEmpty == true
+        ? user!.firstName
+        : (user?.username ?? '');
     final now = DateTime.now();
     final today = '${now.day}/${now.month}/${now.year}';
 
@@ -120,10 +131,7 @@ class _HomePageState extends State<HomePage> {
       child: ListView(
         padding: const EdgeInsets.all(AppSpacing.xl),
         children: [
-          Text(
-            'Hola, $name',
-            style: AppTypography.textTheme.headlineMedium,
-          ),
+          Text('Hola, $name', style: AppTypography.textTheme.headlineMedium),
           const SizedBox(height: 4),
           Text(
             user?.isDesarrollador == true
@@ -141,9 +149,18 @@ class _HomePageState extends State<HomePage> {
             AppCard(
               child: Column(
                 children: [
-                  Text(_error!, style: AppTypography.textTheme.bodyMedium?.copyWith(color: AppColors.danger)),
+                  Text(
+                    _error!,
+                    style: AppTypography.textTheme.bodyMedium?.copyWith(
+                      color: AppColors.danger,
+                    ),
+                  ),
                   const SizedBox(height: 8),
-                  AppButton(label: 'Reintentar', onPressed: _load, variant: AppButtonVariant.secondary),
+                  AppButton(
+                    label: 'Reintentar',
+                    onPressed: _load,
+                    variant: AppButtonVariant.secondary,
+                  ),
                 ],
               ),
             )
@@ -170,7 +187,7 @@ class _HomePageState extends State<HomePage> {
                     onTap: () => context.go('/tickets?unassigned=1'),
                   ),
                   _MetricCard(
-                    title: 'Tickets asignados',
+                    title: 'Mis abiertos',
                     value: '${_stats?.asignadosAMi ?? 0}',
                     icon: Icons.assignment_ind_outlined,
                     tint: AppColors.brand600,
@@ -183,7 +200,7 @@ class _HomePageState extends State<HomePage> {
                     icon: Icons.pending_actions_outlined,
                     tint: AppColors.info,
                     soft: AppColors.infoSoft,
-                    onTap: () => context.go('/proyectos'),
+                    onTap: () => context.go('/tareas?estado=pendiente'),
                   ),
                   _MetricCard(
                     title: 'Tareas en progreso',
@@ -191,7 +208,7 @@ class _HomePageState extends State<HomePage> {
                     icon: Icons.play_circle_outline,
                     tint: AppColors.warning,
                     soft: AppColors.warningSoft,
-                    onTap: () => context.go('/proyectos'),
+                    onTap: () => context.go('/tareas?estado=en_progreso'),
                   ),
                   _MetricCard(
                     title: 'Proyectos activos',
@@ -208,7 +225,9 @@ class _HomePageState extends State<HomePage> {
             Row(
               children: [
                 AppButton(
-                  label: user?.isDesarrollador == true ? 'Nuevo ticket' : 'Reportar incidencia',
+                  label: user?.isDesarrollador == true
+                      ? 'Nuevo ticket'
+                      : 'Reportar incidencia',
                   icon: Icons.add,
                   onPressed: () => context.go('/tickets/nuevo'),
                 ),
@@ -250,7 +269,10 @@ class _HomePageState extends State<HomePage> {
                     padding: const EdgeInsets.only(bottom: 8),
                     child: AppCard(
                       hoverable: true,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
                       onTap: () => context.go('/proyectos/${t.proyectoId}'),
                       child: Row(
                         children: [
@@ -289,16 +311,18 @@ class _HomePageState extends State<HomePage> {
                   : 'Mis incidencias abiertas',
               subtitle: user?.isDesarrollador == true
                   ? (_misTickets.isEmpty
-                      ? 'Incidencias asignadas a ti · ninguna'
-                      : 'Incidencias asignadas a ti · ${_misTickets.length}')
+                        ? 'Incidencias asignadas a ti · ninguna'
+                        : 'Incidencias asignadas a ti · ${_misTickets.length}')
                   : (_misTickets.isEmpty
-                      ? 'Las que reportaste y siguen abiertas'
-                      : '${_misTickets.length} abiertas'),
+                        ? 'Las que reportaste y siguen abiertas'
+                        : '${_misTickets.length} abiertas'),
               action: AppButton(
                 label: 'Ver todos',
                 variant: AppButtonVariant.ghost,
                 onPressed: () => context.go(
-                  user?.isDesarrollador == true ? '/tickets?mine=1' : '/tickets',
+                  user?.isDesarrollador == true
+                      ? '/tickets?mine=1'
+                      : '/tickets',
                 ),
               ),
             ),
@@ -317,7 +341,10 @@ class _HomePageState extends State<HomePage> {
                   padding: const EdgeInsets.only(bottom: 8),
                   child: AppCard(
                     hoverable: true,
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
                     onTap: () => context.go('/tickets/${t.id}'),
                     child: Row(
                       children: [
@@ -332,17 +359,18 @@ class _HomePageState extends State<HomePage> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 4),
-                              Text(
-                                () {
-                                  final parts = <String>[
-                                    if (t.sistemaAfectado.isNotEmpty) t.sistemaAfectado,
-                                    if (t.proyectoTitulo != null && t.proyectoTitulo!.isNotEmpty)
-                                      t.proyectoTitulo!,
-                                  ];
-                                  return parts.isEmpty ? 'Sin sistema' : parts.join(' · ');
-                                }(),
-                                style: AppTypography.textTheme.bodySmall,
-                              ),
+                              Text(() {
+                                final parts = <String>[
+                                  if (t.sistemaAfectado.isNotEmpty)
+                                    t.sistemaAfectado,
+                                  if (t.proyectoTitulo != null &&
+                                      t.proyectoTitulo!.isNotEmpty)
+                                    t.proyectoTitulo!,
+                                ];
+                                return parts.isEmpty
+                                    ? 'Sin sistema'
+                                    : parts.join(' · ');
+                              }(), style: AppTypography.textTheme.bodySmall),
                             ],
                           ),
                         ),

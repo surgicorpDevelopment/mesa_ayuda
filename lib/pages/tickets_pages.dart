@@ -35,6 +35,48 @@ class _TicketsListPageState extends State<TicketsListPage> {
   String _query = '';
   int _countMine = 0;
   int _countUnassigned = 0;
+  /// `recientes` | `prioridad_alta` | `prioridad_baja`
+  String _sortBy = 'prioridad_alta';
+
+  static int _prioridadRank(String p) {
+    switch (p) {
+      case 'alta':
+        return 0;
+      case 'media':
+        return 1;
+      case 'baja':
+        return 2;
+      default:
+        return 3;
+    }
+  }
+
+  void _applySort(List<Ticket> items) {
+    switch (_sortBy) {
+      case 'prioridad_alta':
+        items.sort((a, b) {
+          final c = _prioridadRank(a.prioridad).compareTo(_prioridadRank(b.prioridad));
+          if (c != 0) return c;
+          final da = a.fechaActualizacion ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final db = b.fechaActualizacion ?? DateTime.fromMillisecondsSinceEpoch(0);
+          return db.compareTo(da);
+        });
+      case 'prioridad_baja':
+        items.sort((a, b) {
+          final c = _prioridadRank(b.prioridad).compareTo(_prioridadRank(a.prioridad));
+          if (c != 0) return c;
+          final da = a.fechaActualizacion ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final db = b.fechaActualizacion ?? DateTime.fromMillisecondsSinceEpoch(0);
+          return db.compareTo(da);
+        });
+      default:
+        items.sort((a, b) {
+          final da = a.fechaActualizacion ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final db = b.fechaActualizacion ?? DateTime.fromMillisecondsSinceEpoch(0);
+          return db.compareTo(da);
+        });
+    }
+  }
 
   @override
   void initState() {
@@ -87,6 +129,7 @@ class _TicketsListPageState extends State<TicketsListPage> {
                 (t.asignadoANombre ?? '').toLowerCase().contains(q))
             .toList();
       }
+      _applySort(items);
       if (mounted) {
         setState(() {
           _items = items;
@@ -113,7 +156,7 @@ class _TicketsListPageState extends State<TicketsListPage> {
     final listTitle = widget.onlyUnassigned
         ? 'Cola sin asignar'
         : widget.onlyAssignedToMe
-            ? 'Asignados a mí'
+            ? 'Mis abiertos'
             : 'Tickets';
 
     return Scaffold(
@@ -133,7 +176,9 @@ class _TicketsListPageState extends State<TicketsListPage> {
               children: [
                 SectionHeader(
                   title: listTitle,
-                  subtitle: '${_items.length} resultados',
+                  subtitle: widget.onlyAssignedToMe
+                      ? '${_items.length} resultados · abiertos (sin resueltos ni cerrados)'
+                      : '${_items.length} resultados',
                 ),
                 if (isDev) ...[
                   const SizedBox(height: 10),
@@ -153,14 +198,20 @@ class _TicketsListPageState extends State<TicketsListPage> {
                               : AppColors.slate700,
                         ),
                       ),
-                      FilterChip(
-                        label: Text('Asignados a mí ($_countMine)'),
-                        selected: widget.onlyAssignedToMe,
-                        onSelected: (_) => context.go('/tickets?mine=1'),
-                        selectedColor: AppColors.brand50,
-                        checkmarkColor: AppColors.brand600,
-                        labelStyle: AppTypography.textTheme.labelMedium?.copyWith(
-                          color: widget.onlyAssignedToMe ? AppColors.brand600 : AppColors.slate700,
+                      Tooltip(
+                        message:
+                            'Tickets asignados a ti en Nuevo, En proceso o Esperando.\nNo incluye resueltos ni cerrados.',
+                        child: FilterChip(
+                          label: Text('Mis abiertos ($_countMine)'),
+                          selected: widget.onlyAssignedToMe,
+                          onSelected: (_) => context.go('/tickets?mine=1'),
+                          selectedColor: AppColors.brand50,
+                          checkmarkColor: AppColors.brand600,
+                          labelStyle: AppTypography.textTheme.labelMedium?.copyWith(
+                            color: widget.onlyAssignedToMe
+                                ? AppColors.brand600
+                                : AppColors.slate700,
+                          ),
                         ),
                       ),
                       FilterChip(
@@ -170,10 +221,19 @@ class _TicketsListPageState extends State<TicketsListPage> {
                         selectedColor: AppColors.brand50,
                         checkmarkColor: AppColors.brand600,
                         labelStyle: AppTypography.textTheme.labelMedium?.copyWith(
-                          color: widget.onlyUnassigned ? AppColors.brand600 : AppColors.slate700,
+                          color: widget.onlyUnassigned
+                              ? AppColors.brand600
+                              : AppColors.slate700,
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Mis abiertos = Nuevo + En Proceso + Esperando',
+                    style: AppTypography.textTheme.bodySmall?.copyWith(
+                      color: AppColors.slate500,
+                    ),
                   ),
                 ],
                 const SizedBox(height: 14),
@@ -185,6 +245,46 @@ class _TicketsListPageState extends State<TicketsListPage> {
                         onChanged: (v) {
                           _query = v;
                           _load();
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    SizedBox(
+                      width: 200,
+                      child: DropdownButtonFormField<String>(
+                        initialValue: _sortBy,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Ordenar',
+                          prefixIcon: Icon(Icons.sort, size: 20),
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'prioridad_alta',
+                            child: Text('Prioridad · alta primero'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'prioridad_baja',
+                            child: Text('Prioridad · baja primero'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'recientes',
+                            child: Text('Más recientes'),
+                          ),
+                        ],
+                        onChanged: (v) {
+                          if (v == null) return;
+                          setState(() {
+                            _sortBy = v;
+                            final sorted = List<Ticket>.from(_items);
+                            _applySort(sorted);
+                            _items = sorted;
+                          });
                         },
                       ),
                     ),

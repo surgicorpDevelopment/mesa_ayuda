@@ -41,7 +41,8 @@ class KanbanBoard extends StatefulWidget {
     String estado,
     int? asignadoAId,
     List<TareaEspera> esperando,
-  ) onCreate;
+  )
+  onCreate;
 
   /// Nulo cuando el usuario no puede borrar tareas: la API solo lo permite a
   /// líderes y gestores, así que sin permiso no se muestra la "×".
@@ -52,13 +53,19 @@ class KanbanBoard extends StatefulWidget {
     required String descripcion,
     required int? asignadoAId,
     required List<TareaEspera> esperando,
-  }) onUpdate;
+  })
+  onUpdate;
   final List<AssignableUser> usuarios;
 
   static const _kColumns = [
-    _ColumnDef('pendiente',   'Pendiente',   AppColors.info,    AppColors.infoSoft),
-    _ColumnDef('en_progreso', 'En progreso', AppColors.warning,  AppColors.warningSoft),
-    _ColumnDef('hecho',       'Hecho',       AppColors.success,  AppColors.successSoft),
+    _ColumnDef('pendiente', 'Pendiente', AppColors.info, AppColors.infoSoft),
+    _ColumnDef(
+      'en_progreso',
+      'En progreso',
+      AppColors.warning,
+      AppColors.warningSoft,
+    ),
+    _ColumnDef('hecho', 'Hecho', AppColors.success, AppColors.successSoft),
   ];
 
   @override
@@ -77,8 +84,7 @@ class _KanbanBoardState extends State<KanbanBoard> {
         children: [
           for (int i = 0; i < KanbanBoard._kColumns.length; i++) ...[
             Expanded(child: _buildColumn(KanbanBoard._kColumns[i])),
-            if (i < KanbanBoard._kColumns.length - 1)
-              const SizedBox(width: 12),
+            if (i < KanbanBoard._kColumns.length - 1) const SizedBox(width: 12),
           ],
         ],
       ),
@@ -140,7 +146,10 @@ class _KanbanBoardState extends State<KanbanBoard> {
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: col.softColor,
                         borderRadius: BorderRadius.circular(12),
@@ -175,7 +184,10 @@ class _KanbanBoardState extends State<KanbanBoard> {
                   label: const Text('Agregar tarea'),
                   style: TextButton.styleFrom(
                     foregroundColor: AppColors.slate500,
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 6,
+                    ),
                     textStyle: AppTypography.textTheme.labelSmall,
                   ),
                 ),
@@ -216,7 +228,9 @@ class _KanbanBoardState extends State<KanbanBoard> {
           tarea: tarea,
           accentColor: col.color,
           isDragging: false,
-          onDelete: widget.onDelete == null ? null : () => widget.onDelete!(tarea),
+          onDelete: widget.onDelete == null
+              ? null
+              : () => widget.onDelete!(tarea),
           onEditTap: () => _showEditDialog(tarea),
         ),
       ),
@@ -228,7 +242,10 @@ class _KanbanBoardState extends State<KanbanBoard> {
     final descCtrl = TextEditingController(text: tarea.descripcion);
     int? selectedUserId = tarea.asignadoAId;
     var esperando = List<TareaEspera>.from(tarea.esperando);
-    final usuarios = _usuariosForDropdown(selectedUserId, tarea.asignadoANombre);
+    final usuarios = _usuariosForDropdown(
+      selectedUserId,
+      tarea.asignadoANombre,
+    );
 
     await showDialog<void>(
       context: context,
@@ -259,11 +276,17 @@ class _KanbanBoardState extends State<KanbanBoard> {
                       prefixIcon: Icon(Icons.person_outline),
                     ),
                     items: [
-                      const DropdownMenuItem<int?>(value: null, child: Text('Sin asignar')),
+                      const DropdownMenuItem<int?>(
+                        value: null,
+                        child: Text('Sin asignar'),
+                      ),
                       for (final u in usuarios)
                         DropdownMenuItem<int?>(
                           value: u.id,
-                          child: Text(u.fullName, overflow: TextOverflow.ellipsis),
+                          child: Text(
+                            u.fullName,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                     ],
                     onChanged: (v) => setStateDialog(() => selectedUserId = v),
@@ -307,7 +330,10 @@ class _KanbanBoardState extends State<KanbanBoard> {
     descCtrl.dispose();
   }
 
-  List<AssignableUser> _usuariosForDropdown(int? selectedId, String? selectedName) {
+  List<AssignableUser> _usuariosForDropdown(
+    int? selectedId,
+    String? selectedName,
+  ) {
     final seen = <int>{};
     final list = <AssignableUser>[];
     for (final u in widget.usuarios) {
@@ -343,7 +369,10 @@ class _KanbanBoardState extends State<KanbanBoard> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  AppTextField(controller: titleCtrl, label: 'Título de la tarea'),
+                  AppTextField(
+                    controller: titleCtrl,
+                    label: 'Título de la tarea',
+                  ),
                   if (usuarios.isNotEmpty) ...[
                     const SizedBox(height: 14),
                     DropdownButtonFormField<int?>(
@@ -354,14 +383,21 @@ class _KanbanBoardState extends State<KanbanBoard> {
                         prefixIcon: Icon(Icons.person_outline),
                       ),
                       items: [
-                        const DropdownMenuItem<int?>(value: null, child: Text('Sin asignar')),
+                        const DropdownMenuItem<int?>(
+                          value: null,
+                          child: Text('Sin asignar'),
+                        ),
                         for (final u in usuarios)
                           DropdownMenuItem<int?>(
                             value: u.id,
-                            child: Text(u.fullName, overflow: TextOverflow.ellipsis),
+                            child: Text(
+                              u.fullName,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                       ],
-                      onChanged: (v) => setStateDialog(() => selectedUserId = v),
+                      onChanged: (v) =>
+                          setStateDialog(() => selectedUserId = v),
                     ),
                   ],
                   const SizedBox(height: 16),
@@ -440,7 +476,9 @@ class _TareaCardContent extends StatelessWidget {
                   width: 4,
                   decoration: BoxDecoration(
                     color: accentColor,
-                    borderRadius: const BorderRadius.horizontal(left: Radius.circular(9)),
+                    borderRadius: const BorderRadius.horizontal(
+                      left: Radius.circular(9),
+                    ),
                   ),
                 ),
                 Expanded(
@@ -455,17 +493,19 @@ class _TareaCardContent extends StatelessWidget {
                             Expanded(
                               child: Text(
                                 tarea.titulo,
-                                style: AppTypography.textTheme.titleSmall?.copyWith(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.slate900,
-                                  height: 1.25,
-                                ),
+                                style: AppTypography.textTheme.titleSmall
+                                    ?.copyWith(
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.slate900,
+                                      height: 1.25,
+                                    ),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            if (!isDragging && (onEditTap != null || onDelete != null)) ...[
+                            if (!isDragging &&
+                                (onEditTap != null || onDelete != null)) ...[
                               const SizedBox(width: 4),
                               if (onEditTap != null)
                                 _CardIconButton(
@@ -504,11 +544,12 @@ class _TareaCardContent extends StatelessWidget {
                               Expanded(
                                 child: Text(
                                   asignado,
-                                  style: AppTypography.textTheme.bodySmall?.copyWith(
-                                    color: AppColors.slate700,
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                                  style: AppTypography.textTheme.bodySmall
+                                      ?.copyWith(
+                                        color: AppColors.slate700,
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -525,10 +566,11 @@ class _TareaCardContent extends StatelessWidget {
                                     const SizedBox(width: 4),
                                     Text(
                                       'Sin asignar',
-                                      style: AppTypography.textTheme.bodySmall?.copyWith(
-                                        color: AppColors.slate500,
-                                        fontSize: 11.5,
-                                      ),
+                                      style: AppTypography.textTheme.bodySmall
+                                          ?.copyWith(
+                                            color: AppColors.slate500,
+                                            fontSize: 11.5,
+                                          ),
                                     ),
                                   ],
                                 ),
@@ -541,7 +583,9 @@ class _TareaCardContent extends StatelessWidget {
                             width: double.infinity,
                             padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),
                             decoration: BoxDecoration(
-                              color: AppColors.warningSoft.withValues(alpha: 0.65),
+                              color: AppColors.warningSoft.withValues(
+                                alpha: 0.65,
+                              ),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Column(
@@ -557,11 +601,12 @@ class _TareaCardContent extends StatelessWidget {
                                     const SizedBox(width: 5),
                                     Text(
                                       'Esperando · ${esperando.length}',
-                                      style: AppTypography.textTheme.labelSmall?.copyWith(
-                                        color: AppColors.warning,
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 11,
-                                      ),
+                                      style: AppTypography.textTheme.labelSmall
+                                          ?.copyWith(
+                                            color: AppColors.warning,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 11,
+                                          ),
                                     ),
                                   ],
                                 ),
@@ -727,7 +772,9 @@ class _EsperandoFieldState extends State<_EsperandoField> {
     }
 
     if (nombre == null || nombre.isEmpty) {
-      setState(() => _error = 'Elige una persona del sistema o escribe un nombre.');
+      setState(
+        () => _error = 'Elige una persona del sistema o escribe un nombre.',
+      );
       return;
     }
     if (_yaEsta(nombre)) {
@@ -764,7 +811,11 @@ class _EsperandoFieldState extends State<_EsperandoField> {
         children: [
           Row(
             children: [
-              Icon(Icons.hourglass_top_rounded, size: 18, color: AppColors.warning),
+              Icon(
+                Icons.hourglass_top_rounded,
+                size: 18,
+                color: AppColors.warning,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -780,7 +831,9 @@ class _EsperandoFieldState extends State<_EsperandoField> {
           const SizedBox(height: 4),
           Text(
             'De quién dependes para avanzar y qué le pediste. Puedes agregar varias personas.',
-            style: AppTypography.textTheme.bodySmall?.copyWith(color: AppColors.slate500),
+            style: AppTypography.textTheme.bodySmall?.copyWith(
+              color: AppColors.slate500,
+            ),
           ),
           const SizedBox(height: 12),
           if (value.isEmpty)
@@ -794,13 +847,17 @@ class _EsperandoFieldState extends State<_EsperandoField> {
               ),
               child: Text(
                 'Nadie en espera todavía. Completa el formulario de abajo.',
-                style: AppTypography.textTheme.bodySmall?.copyWith(color: AppColors.slate500),
+                style: AppTypography.textTheme.bodySmall?.copyWith(
+                  color: AppColors.slate500,
+                ),
               ),
             )
           else ...[
             Text(
               'En espera (${value.length})',
-              style: AppTypography.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+              style: AppTypography.textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
             ),
             const SizedBox(height: 8),
             for (var i = 0; i < value.length; i++)
@@ -823,21 +880,23 @@ class _EsperandoFieldState extends State<_EsperandoField> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              value[i].esExterno ? '${value[i].nombre} · externo' : value[i].nombre,
-                              style: AppTypography.textTheme.labelMedium?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
+                              value[i].esExterno
+                                  ? '${value[i].nombre} · externo'
+                                  : value[i].nombre,
+                              style: AppTypography.textTheme.labelMedium
+                                  ?.copyWith(fontWeight: FontWeight.w700),
                             ),
                             const SizedBox(height: 2),
                             Text(
                               value[i].detalle.isEmpty
                                   ? 'Sin detalle de lo pedido'
                                   : value[i].detalle,
-                              style: AppTypography.textTheme.bodySmall?.copyWith(
-                                color: value[i].detalle.isEmpty
-                                    ? AppColors.slate300
-                                    : AppColors.slate500,
-                              ),
+                              style: AppTypography.textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: value[i].detalle.isEmpty
+                                        ? AppColors.slate300
+                                        : AppColors.slate500,
+                                  ),
                             ),
                           ],
                         ),
@@ -846,10 +905,15 @@ class _EsperandoFieldState extends State<_EsperandoField> {
                         tooltip: 'Quitar',
                         visualDensity: VisualDensity.compact,
                         onPressed: () {
-                          final next = List<TareaEspera>.from(value)..removeAt(i);
+                          final next = List<TareaEspera>.from(value)
+                            ..removeAt(i);
                           widget.onChanged(next);
                         },
-                        icon: const Icon(Icons.close, size: 18, color: AppColors.slate500),
+                        icon: const Icon(
+                          Icons.close,
+                          size: 18,
+                          color: AppColors.slate500,
+                        ),
                       ),
                     ],
                   ),
@@ -869,7 +933,9 @@ class _EsperandoFieldState extends State<_EsperandoField> {
               children: [
                 Text(
                   'Agregar a la lista',
-                  style: AppTypography.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+                  style: AppTypography.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 const SizedBox(height: 14),
                 _EsperandoPaso(
@@ -891,7 +957,9 @@ class _EsperandoFieldState extends State<_EsperandoField> {
                     children: [
                       if (usuarios.isNotEmpty) ...[
                         DropdownButtonFormField<int?>(
-                          key: ValueKey('esp-${value.length}-$_usuarioSeleccionado'),
+                          key: ValueKey(
+                            'esp-${value.length}-$_usuarioSeleccionado',
+                          ),
                           initialValue: _usuarioSeleccionado,
                           isExpanded: true,
                           decoration: const InputDecoration(
@@ -899,12 +967,18 @@ class _EsperandoFieldState extends State<_EsperandoField> {
                             prefixIcon: Icon(Icons.person_outline),
                           ),
                           items: [
-                            const DropdownMenuItem<int?>(value: null, child: Text('Elegir…')),
+                            const DropdownMenuItem<int?>(
+                              value: null,
+                              child: Text('Elegir…'),
+                            ),
                             for (final u in usuarios)
                               if (!_yaEsta(u.fullName))
                                 DropdownMenuItem<int?>(
                                   value: u.id,
-                                  child: Text(u.fullName, overflow: TextOverflow.ellipsis),
+                                  child: Text(
+                                    u.fullName,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
                           ],
                           onChanged: (id) => setState(() {
@@ -919,12 +993,13 @@ class _EsperandoFieldState extends State<_EsperandoField> {
                             children: [
                               const Expanded(child: Divider()),
                               Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                ),
                                 child: Text(
                                   'o nombre libre',
-                                  style: AppTypography.textTheme.labelSmall?.copyWith(
-                                    color: AppColors.slate500,
-                                  ),
+                                  style: AppTypography.textTheme.labelSmall
+                                      ?.copyWith(color: AppColors.slate500),
                                 ),
                               ),
                               const Expanded(child: Divider()),
@@ -948,7 +1023,9 @@ class _EsperandoFieldState extends State<_EsperandoField> {
                   const SizedBox(height: 8),
                   Text(
                     _error!,
-                    style: AppTypography.textTheme.bodySmall?.copyWith(color: AppColors.danger),
+                    style: AppTypography.textTheme.bodySmall?.copyWith(
+                      color: AppColors.danger,
+                    ),
                   ),
                 ],
                 const SizedBox(height: 14),
@@ -1007,7 +1084,9 @@ class _EsperandoPaso extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               titulo,
-              style: AppTypography.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+              style: AppTypography.textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ],
         ),
