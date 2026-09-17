@@ -176,9 +176,7 @@ class _TicketsListPageState extends State<TicketsListPage> {
               children: [
                 SectionHeader(
                   title: listTitle,
-                  subtitle: widget.onlyAssignedToMe
-                      ? '${_items.length} resultados · abiertos (sin resueltos ni cerrados)'
-                      : '${_items.length} resultados',
+                  subtitle: '${_items.length} resultados',
                 ),
                 if (isDev) ...[
                   const SizedBox(height: 10),
@@ -200,7 +198,7 @@ class _TicketsListPageState extends State<TicketsListPage> {
                       ),
                       Tooltip(
                         message:
-                            'Tickets asignados a ti en Nuevo, En proceso o Esperando.\nNo incluye resueltos ni cerrados.',
+                            'Asignados a ti en Nuevo, En proceso o Esperando.\nNo incluye resueltos ni cerrados.',
                         child: FilterChip(
                           label: Text('Mis abiertos ($_countMine)'),
                           selected: widget.onlyAssignedToMe,
@@ -227,13 +225,6 @@ class _TicketsListPageState extends State<TicketsListPage> {
                         ),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Mis abiertos = Nuevo + En Proceso + Esperando',
-                    style: AppTypography.textTheme.bodySmall?.copyWith(
-                      color: AppColors.slate500,
-                    ),
                   ),
                 ],
                 const SizedBox(height: 14),

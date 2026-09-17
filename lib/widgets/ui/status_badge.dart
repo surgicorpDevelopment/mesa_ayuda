@@ -13,8 +13,11 @@ class StatusBadge extends StatelessWidget {
     this.width,
   });
 
-  /// Ancho fijo para alinear badges en listas (cubre "En Proceso" / "Planificado").
-  static const double estadoWidth = 108;
+  /// Ancho fijo compartido con [PriorityIndicator] (cubre "En Proceso" / "Planificado").
+  static const double badgeWidth = 108;
+
+  /// Alias histórico.
+  static const double estadoWidth = badgeWidth;
 
   final String label;
   final Color color;
@@ -22,7 +25,7 @@ class StatusBadge extends StatelessWidget {
   final bool showDot;
   final double? width;
 
-  factory StatusBadge.estado(String estado, {double? width = estadoWidth}) {
+  factory StatusBadge.estado(String estado, {double? width = badgeWidth}) {
     return StatusBadge(
       label: labelEstado(estado),
       color: estadoColor(estado),
@@ -36,7 +39,9 @@ class StatusBadge extends StatelessWidget {
     final bg = softColor ?? color.withValues(alpha: 0.12);
     return Container(
       width: width,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      height: 30,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      alignment: Alignment.center,
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(20),
@@ -79,11 +84,11 @@ class PriorityIndicator extends StatelessWidget {
   const PriorityIndicator({
     super.key,
     required this.prioridad,
-    this.width = priorityWidth,
+    this.width = StatusBadge.badgeWidth,
   });
 
-  /// Ancho fijo para Alta / Media / Baja.
-  static const double priorityWidth = 78;
+  /// Mismo ancho que [StatusBadge.badgeWidth].
+  static const double priorityWidth = StatusBadge.badgeWidth;
 
   final String prioridad;
   final double? width;
@@ -93,7 +98,9 @@ class PriorityIndicator extends StatelessWidget {
     final color = prioridadColor(prioridad);
     return Container(
       width: width,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      height: 30,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      alignment: Alignment.center,
       decoration: BoxDecoration(
         color: prioridadSoft(prioridad),
         borderRadius: BorderRadius.circular(20),
@@ -105,9 +112,13 @@ class PriorityIndicator extends StatelessWidget {
         children: [
           Icon(Icons.flag_rounded, size: 14, color: color),
           const SizedBox(width: 6),
-          Text(
-            labelPrioridad(prioridad),
-            style: AppTypography.textTheme.labelMedium?.copyWith(color: color),
+          Flexible(
+            child: Text(
+              labelPrioridad(prioridad),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTypography.textTheme.labelMedium?.copyWith(color: color),
+            ),
           ),
         ],
       ),

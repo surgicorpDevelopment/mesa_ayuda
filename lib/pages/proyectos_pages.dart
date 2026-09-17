@@ -25,6 +25,52 @@ class _ProyectosListPageState extends State<ProyectosListPage> {
   bool _loading = true;
   String? _error;
   String? _estadoFilter;
+  /// `inicio_prox` | `inicio_lejos` | `fin_prox` | `recientes` | `prioridad_alta`
+  String _sortBy = 'inicio_prox';
+
+  static int _prioridadRank(String p) {
+    switch (p) {
+      case 'alta':
+        return 0;
+      case 'media':
+        return 1;
+      case 'baja':
+        return 2;
+      default:
+        return 3;
+    }
+  }
+
+  static DateTime _epoch = DateTime.fromMillisecondsSinceEpoch(0);
+  static DateTime _far = DateTime(9999);
+
+  void _applySort(List<Proyecto> items) {
+    int cmpDate(DateTime? a, DateTime? b, {required bool ascending}) {
+      final da = a ?? (ascending ? _far : _epoch);
+      final db = b ?? (ascending ? _far : _epoch);
+      return ascending ? da.compareTo(db) : db.compareTo(da);
+    }
+
+    switch (_sortBy) {
+      case 'inicio_lejos':
+        items.sort((a, b) => cmpDate(a.fechaInicio, b.fechaInicio, ascending: false));
+      case 'fin_prox':
+        items.sort((a, b) => cmpDate(a.fechaObjetivo, b.fechaObjetivo, ascending: true));
+      case 'recientes':
+        items.sort(
+          (a, b) => cmpDate(a.fechaActualizacion, b.fechaActualizacion, ascending: false),
+        );
+      case 'prioridad_alta':
+        items.sort((a, b) {
+          final c = _prioridadRank(a.prioridad).compareTo(_prioridadRank(b.prioridad));
+          if (c != 0) return c;
+          return cmpDate(a.fechaInicio, b.fechaInicio, ascending: true);
+        });
+      case 'inicio_prox':
+      default:
+        items.sort((a, b) => cmpDate(a.fechaInicio, b.fechaInicio, ascending: true));
+    }
+  }
 
   @override
   void initState() {
@@ -47,6 +93,7 @@ class _ProyectosListPageState extends State<ProyectosListPage> {
       for (final t in allTareas) {
         map.putIfAbsent(t.proyectoId, () => []).add(t);
       }
+      _applySort(items);
       if (mounted) {
         setState(() {
           _items = items;
@@ -106,26 +153,81 @@ class _ProyectosListPageState extends State<ProyectosListPage> {
                   subtitle: '${_items.length} proyectos',
                 ),
                 const SizedBox(height: 12),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      for (final e in estados)
-                        Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: FilterChip(
-                            label: Text(e == null ? 'Todos' : labelEstado(e)),
-                            selected: _estadoFilter == e,
-                            onSelected: (_) {
-                              setState(() => _estadoFilter = e);
-                              _load();
-                            },
-                            selectedColor: AppColors.brand50,
-                            checkmarkColor: AppColors.brand600,
+                Row(
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            for (final e in estados)
+                              Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: FilterChip(
+                                  label:
+                                      Text(e == null ? 'Todos' : labelEstado(e)),
+                                  selected: _estadoFilter == e,
+                                  onSelected: (_) {
+                                    setState(() => _estadoFilter = e);
+                                    _load();
+                                  },
+                                  selectedColor: AppColors.brand50,
+                                  checkmarkColor: AppColors.brand600,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    SizedBox(
+                      width: 210,
+                      child: DropdownButtonFormField<String>(
+                        initialValue: _sortBy,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Ordenar',
+                          prefixIcon: Icon(Icons.sort, size: 20),
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
                           ),
                         ),
-                    ],
-                  ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'inicio_prox',
+                            child: Text('Inicio · más próximo'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'inicio_lejos',
+                            child: Text('Inicio · más lejano'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'fin_prox',
+                            child: Text('Fin · más próximo'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'recientes',
+                            child: Text('Más recientes'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'prioridad_alta',
+                            child: Text('Prioridad · alta primero'),
+                          ),
+                        ],
+                        onChanged: (v) {
+                          if (v == null) return;
+                          setState(() {
+                            _sortBy = v;
+                            final sorted = List<Proyecto>.from(_items);
+                            _applySort(sorted);
+                            _items = sorted;
+                          });
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -726,6 +828,19 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
     }
   }
 
+  Future<void> _setPrioridad(String prioridad) async {
+    try {
+      final p = await context.read<AuthProvider>().api.updateProyecto(
+        widget.id,
+        {'prioridad': prioridad},
+      );
+      if (mounted) setState(() => _proyecto = p);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
   Future<void> _setResponsable(int? responsableId) async {
     try {
       final p = await context.read<AuthProvider>().api.updateProyecto(
@@ -1088,6 +1203,7 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   StatusBadge.estado(p.estado),
                   PriorityIndicator(prioridad: p.prioridad),
@@ -1097,6 +1213,7 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
                       color: AppColors.danger,
                       softColor: AppColors.dangerSoft,
                       showDot: false,
+                      width: StatusBadge.badgeWidth,
                     ),
                 ],
               ),
@@ -1293,6 +1410,23 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
                         color: estadoColor(e),
                         softColor: estadoSoft(e),
                         onTap: () => _setEstado(e),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Text('Prioridad', style: AppTypography.textTheme.labelMedium),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final pr in ['alta', 'media', 'baja'])
+                      ColorChip(
+                        label: labelPrioridad(pr),
+                        selected: p.prioridad == pr,
+                        color: prioridadColor(pr),
+                        softColor: prioridadSoft(pr),
+                        onTap: () => _setPrioridad(pr),
                       ),
                   ],
                 ),
