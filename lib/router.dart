@@ -46,9 +46,11 @@ GoRouter createRouter(AuthProvider auth) {
             builder: (context, state) {
               final mine = state.uri.queryParameters['mine'] == '1';
               final unassigned = state.uri.queryParameters['unassigned'] == '1';
+              final bandeja = state.uri.queryParameters['bandeja'];
               return TicketsListPage(
                 onlyAssignedToMe: mine,
                 onlyUnassigned: unassigned,
+                initialBandeja: bandeja,
               );
             },
           ),
@@ -69,10 +71,14 @@ GoRouter createRouter(AuthProvider auth) {
           GoRoute(
             path: '/tareas',
             builder: (_, state) {
-              final estado = state.uri.queryParameters['estado'] ?? 'pendiente';
-              final normalized =
-                  estado == 'en_progreso' ? 'en_progreso' : 'pendiente';
-              return MisTareasPage(estado: normalized);
+              final estado = state.uri.queryParameters['estado'];
+              return MisTareasPage(
+                initialFilter: estado == 'en_progreso' ||
+                        estado == 'pendiente' ||
+                        estado == 'hecho'
+                    ? estado
+                    : null,
+              );
             },
           ),
           GoRoute(
@@ -85,8 +91,10 @@ GoRouter createRouter(AuthProvider auth) {
           ),
           GoRoute(
             path: '/proyectos/:id',
-            builder: (_, state) =>
-                ProyectoDetailPage(id: int.parse(state.pathParameters['id']!)),
+            builder: (_, state) => ProyectoDetailPage(
+              id: int.parse(state.pathParameters['id']!),
+              initialTab: state.uri.queryParameters['tab'],
+            ),
           ),
           GoRoute(
             path: '/reportes',

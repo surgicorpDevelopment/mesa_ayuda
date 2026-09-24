@@ -63,7 +63,9 @@ u.groups.add(Group.objects.get(name='gp_gestor_proyectos'))
 Grupos: `gp_usuario`, `gp_desarrollador`, `gp_lider_area`, `gp_gestor_proyectos`.
 
 **Tickets (helpdesk):** usuarios finales (`gp_usuario`) solo crean/ven los suyos.
-Desarrolladores+ ven cola global de abiertos sin asignar (`POST /GP_Ticket/{id}/tomar/`).
+Un usuario regular crea el ticket en `por_aprobar`. Líder del área o gestor lo aprueba (`nuevo`, entra a la cola) o lo rechaza (`rechazado` + comentario). Desarrollador, líder y gestor crean directo en `nuevo`.
+
+Desarrolladores+ ven cola global de abiertos sin asignar (`POST /GP_Ticket/{id}/tomar/`). `por_aprobar` y `rechazado` no entran a esa cola.
 **Proyectos y tareas:** solo desarrolladores, líderes y gestores.
 **Eliminar ticket o proyecto:** `DELETE /GP_Ticket/{id}/` y `DELETE /GP_Proyecto/{id}/`
 solo líderes/gestores (`gp_lider_area` / `gp_gestor_proyectos`). Borra también
@@ -82,6 +84,8 @@ Las reglas de visibilidad viven en un solo sitio, `GestionProyectos/scoping.py`
 | Tickets | `GET/POST /GP_Ticket/` |
 | Inbox | `GET /GP_Ticket/inbox/` (incluye `cola_sin_asignar`) |
 | Tomar ticket | `POST /GP_Ticket/{id}/tomar/` |
+| Aprobar ticket | `POST /GP_Ticket/{id}/aprobar/` (líder del área o gestor; solo si `por_aprobar`) |
+| Rechazar ticket | `POST /GP_Ticket/{id}/rechazar/` body `{ "comentario": "motivo" }` |
 | Adjuntos de ticket | `POST /GP_Ticket/{id}/adjuntos/` (multipart, campo `archivo`) |
 | Tareas (Kanban) | `GET/POST /GP_Tarea/?proyecto=<id>` |
 | Sistemas | `GET/POST /GP_Sistema/` · `GET /GP_Sistema/?activo=true` |
@@ -90,6 +94,9 @@ Las reglas de visibilidad viven en un solo sitio, `GestionProyectos/scoping.py`
 | Asignables | `GET /GP_Usuario/?q=<texto>` |
 | Perfil y rol | `GET /GP_Usuario/me/` |
 | Productividad | `GET /GP_Productividad/?desde=YYYY-MM-DD&hasta=YYYY-MM-DD` |
+
+En `actividad[]`, cada evento incluye `tipo`, `ref_id`, `titulo` y, para tareas,
+`proyecto_id` (para abrir el proyecto en la UI).
 
 Auth: `Authorization: Bearer <access>` de `POST /api/token/`.
 
@@ -118,12 +125,13 @@ primera vez en `en_proceso`, `resuelto` y `cerrado`.
 No cambia el estado Kanban. Cada ítem:
 
 ```json
-{ "nombre": "María López", "usuario_id": 12, "detalle": "Revisar el script de migración" }
+{ "nombre": "María López", "usuario_id": 12, "detalle": "Revisar el script de migración", "cumplido": false }
 ```
 
 - Nombre libre: `"usuario_id": null`.
 - Usuario del sistema: `nombre` + `usuario_id` (para un futuro aviso por correo).
 - `detalle`: qué se le pide a esa persona (texto libre, puede ir vacío).
+- `cumplido`: `true` cuando esa persona ya entregó lo pedido (default `false`).
 
 ### `GET /GP_Usuario/me/`
 

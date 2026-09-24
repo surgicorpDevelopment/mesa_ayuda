@@ -680,9 +680,15 @@ class _ProyectoFormPageState extends State<ProyectoFormPage> {
 }
 
 class ProyectoDetailPage extends StatefulWidget {
-  const ProyectoDetailPage({super.key, required this.id});
+  const ProyectoDetailPage({
+    super.key,
+    required this.id,
+    this.initialTab,
+  });
 
   final int id;
+  /// `tareas` abre la pestaña Kanban; cualquier otro valor (o null) abre Detalle.
+  final String? initialTab;
 
   @override
   State<ProyectoDetailPage> createState() => _ProyectoDetailPageState();
@@ -711,7 +717,11 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: widget.initialTab == 'tareas' ? 1 : 0,
+    );
     _load();
   }
 

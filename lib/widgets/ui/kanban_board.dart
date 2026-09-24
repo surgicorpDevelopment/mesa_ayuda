@@ -232,8 +232,27 @@ class _KanbanBoardState extends State<KanbanBoard> {
               ? null
               : () => widget.onDelete!(tarea),
           onEditTap: () => _showEditDialog(tarea),
+          onToggleEsperaCumplido: (index) => _toggleEsperaCumplido(tarea, index),
         ),
       ),
+    );
+  }
+
+  void _toggleEsperaCumplido(Tarea tarea, int index) {
+    if (index < 0 || index >= tarea.esperando.length) return;
+    final next = [
+      for (var i = 0; i < tarea.esperando.length; i++)
+        if (i == index)
+          tarea.esperando[i].copyWith(cumplido: !tarea.esperando[i].cumplido)
+        else
+          tarea.esperando[i],
+    ];
+    widget.onUpdate(
+      tarea,
+      titulo: tarea.titulo,
+      descripcion: tarea.descripcion,
+      asignadoAId: tarea.asignadoAId,
+      esperando: next,
     );
   }
 
@@ -441,6 +460,7 @@ class _TareaCardContent extends StatelessWidget {
     required this.isDragging,
     this.onDelete,
     this.onEditTap,
+    this.onToggleEsperaCumplido,
   });
 
   final Tarea tarea;
@@ -448,6 +468,7 @@ class _TareaCardContent extends StatelessWidget {
   final bool isDragging;
   final VoidCallback? onDelete;
   final VoidCallback? onEditTap;
+  final ValueChanged<int>? onToggleEsperaCumplido;
 
   @override
   Widget build(BuildContext context) {
@@ -579,44 +600,74 @@ class _TareaCardContent extends StatelessWidget {
                         ),
                         if (esperando.isNotEmpty) ...[
                           const SizedBox(height: 10),
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),
-                            decoration: BoxDecoration(
-                              color: AppColors.warningSoft.withValues(
-                                alpha: 0.65,
-                              ),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
+                          Builder(
+                            builder: (context) {
+                              final pendientes =
+                                  esperando.where((e) => !e.cumplido).length;
+                              final todosCumplidos = pendientes == 0;
+                              final accent = todosCumplidos
+                                  ? AppColors.success
+                                  : AppColors.warning;
+                              final soft = todosCumplidos
+                                  ? AppColors.successSoft
+                                  : AppColors.warningSoft;
+                              return Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),
+                                decoration: BoxDecoration(
+                                  color: soft.withValues(alpha: 0.65),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Icon(
-                                      Icons.hourglass_top_rounded,
-                                      size: 13,
-                                      color: AppColors.warning,
-                                    ),
-                                    const SizedBox(width: 5),
-                                    Text(
-                                      'Esperando · ${esperando.length}',
-                                      style: AppTypography.textTheme.labelSmall
-                                          ?.copyWith(
-                                            color: AppColors.warning,
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 11,
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          todosCumplidos
+                                              ? Icons.check_circle_outline
+                                              : Icons.hourglass_top_rounded,
+                                          size: 13,
+                                          color: accent,
+                                        ),
+                                        const SizedBox(width: 5),
+                                        Expanded(
+                                          child: Text(
+                                            todosCumplidos
+                                                ? 'Espera cumplida · ${esperando.length}'
+                                                : 'Esperando · $pendientes/${esperando.length}',
+                                            style: AppTypography
+                                                .textTheme.labelSmall
+                                                ?.copyWith(
+                                              color: accent,
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 11,
+                                            ),
                                           ),
+                                        ),
+                                      ],
                                     ),
+                                    const SizedBox(height: 6),
+                                    for (var i = 0;
+                                        i < esperando.length;
+                                        i++) ...[
+                                      if (i > 0) const SizedBox(height: 5),
+                                      _EsperandoCardRow(
+                                        persona: esperando[i],
+                                        onToggleCumplido:
+                                            isDragging ||
+                                                    onToggleEsperaCumplido ==
+                                                        null
+                                                ? null
+                                                : () => onToggleEsperaCumplido!(
+                                                      i,
+                                                    ),
+                                      ),
+                                    ],
                                   ],
                                 ),
-                                const SizedBox(height: 6),
-                                for (var i = 0; i < esperando.length; i++) ...[
-                                  if (i > 0) const SizedBox(height: 5),
-                                  _EsperandoCardRow(persona: esperando[i]),
-                                ],
-                              ],
-                            ),
+                              );
+                            },
                           ),
                         ],
                       ],
@@ -660,12 +711,20 @@ class _CardIconButton extends StatelessWidget {
 }
 
 class _EsperandoCardRow extends StatelessWidget {
-  const _EsperandoCardRow({required this.persona});
+  const _EsperandoCardRow({
+    required this.persona,
+    this.onToggleCumplido,
+  });
 
   final TareaEspera persona;
+  final VoidCallback? onToggleCumplido;
 
   @override
   Widget build(BuildContext context) {
+    final cumplido = persona.cumplido;
+    final nameColor = cumplido ? AppColors.slate500 : AppColors.slate900;
+    final detailColor = cumplido ? AppColors.slate300 : AppColors.slate500;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -684,9 +743,12 @@ class _EsperandoCardRow extends StatelessWidget {
                     TextSpan(
                       text: persona.nombre,
                       style: AppTypography.textTheme.labelSmall?.copyWith(
-                        color: AppColors.slate900,
+                        color: nameColor,
                         fontWeight: FontWeight.w700,
                         fontSize: 11,
+                        decoration:
+                            cumplido ? TextDecoration.lineThrough : null,
+                        decorationColor: AppColors.slate500,
                       ),
                     ),
                     if (persona.esExterno)
@@ -695,6 +757,15 @@ class _EsperandoCardRow extends StatelessWidget {
                         style: AppTypography.textTheme.labelSmall?.copyWith(
                           color: AppColors.slate500,
                           fontSize: 10,
+                        ),
+                      ),
+                    if (cumplido)
+                      TextSpan(
+                        text: ' · cumplido',
+                        style: AppTypography.textTheme.labelSmall?.copyWith(
+                          color: AppColors.success,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                   ],
@@ -706,9 +777,10 @@ class _EsperandoCardRow extends StatelessWidget {
                 Text(
                   persona.detalle,
                   style: AppTypography.textTheme.labelSmall?.copyWith(
-                    color: AppColors.slate500,
+                    color: detailColor,
                     fontSize: 10.5,
                     height: 1.25,
+                    decoration: cumplido ? TextDecoration.lineThrough : null,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -716,6 +788,24 @@ class _EsperandoCardRow extends StatelessWidget {
             ],
           ),
         ),
+        if (onToggleCumplido != null)
+          Tooltip(
+            message: cumplido ? 'Marcar como pendiente' : 'Marcar como cumplido',
+            child: InkWell(
+              onTap: onToggleCumplido,
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.all(2),
+                child: Icon(
+                  cumplido
+                      ? Icons.check_circle
+                      : Icons.radio_button_unchecked,
+                  size: 18,
+                  color: cumplido ? AppColors.success : AppColors.slate300,
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -853,26 +943,65 @@ class _EsperandoFieldState extends State<_EsperandoField> {
               ),
             )
           else ...[
-            Text(
-              'En espera (${value.length})',
-              style: AppTypography.textTheme.labelMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
+            Builder(
+              builder: (context) {
+                final pendientes = value.where((e) => !e.cumplido).length;
+                final titulo = pendientes == 0
+                    ? 'En espera (${value.length}) · todo cumplido'
+                    : 'En espera · $pendientes pendientes de ${value.length}';
+                return Text(
+                  titulo,
+                  style: AppTypography.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 8),
             for (var i = 0; i < value.length; i++)
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Container(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 6, 10),
+                  padding: const EdgeInsets.fromLTRB(8, 8, 4, 8),
                   decoration: BoxDecoration(
-                    color: AppColors.white,
+                    color: value[i].cumplido
+                        ? AppColors.successSoft.withValues(alpha: 0.55)
+                        : AppColors.white,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.slate200),
+                    border: Border.all(
+                      color: value[i].cumplido
+                          ? AppColors.success.withValues(alpha: 0.35)
+                          : AppColors.slate200,
+                    ),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      IconButton(
+                        tooltip: value[i].cumplido
+                            ? 'Marcar como pendiente'
+                            : 'Marcar como cumplido',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () {
+                          final next = [
+                            for (var j = 0; j < value.length; j++)
+                              if (j == i)
+                                value[j].copyWith(cumplido: !value[j].cumplido)
+                              else
+                                value[j],
+                          ];
+                          widget.onChanged(next);
+                        },
+                        icon: Icon(
+                          value[i].cumplido
+                              ? Icons.check_circle
+                              : Icons.radio_button_unchecked,
+                          size: 22,
+                          color: value[i].cumplido
+                              ? AppColors.success
+                              : AppColors.slate300,
+                        ),
+                      ),
                       AppAvatar(name: value[i].nombre, size: 28),
                       const SizedBox(width: 10),
                       Expanded(
@@ -884,7 +1013,15 @@ class _EsperandoFieldState extends State<_EsperandoField> {
                                   ? '${value[i].nombre} · externo'
                                   : value[i].nombre,
                               style: AppTypography.textTheme.labelMedium
-                                  ?.copyWith(fontWeight: FontWeight.w700),
+                                  ?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                decoration: value[i].cumplido
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                                color: value[i].cumplido
+                                    ? AppColors.slate500
+                                    : AppColors.slate900,
+                              ),
                             ),
                             const SizedBox(height: 2),
                             Text(
@@ -893,11 +1030,25 @@ class _EsperandoFieldState extends State<_EsperandoField> {
                                   : value[i].detalle,
                               style: AppTypography.textTheme.bodySmall
                                   ?.copyWith(
-                                    color: value[i].detalle.isEmpty
-                                        ? AppColors.slate300
-                                        : AppColors.slate500,
-                                  ),
+                                color: value[i].detalle.isEmpty
+                                    ? AppColors.slate300
+                                    : AppColors.slate500,
+                                decoration: value[i].cumplido
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                              ),
                             ),
+                            if (value[i].cumplido) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                'Cumplido',
+                                style: AppTypography.textTheme.labelSmall
+                                    ?.copyWith(
+                                  color: AppColors.success,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),

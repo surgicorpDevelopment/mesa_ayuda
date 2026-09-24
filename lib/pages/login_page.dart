@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../config/app_version.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
@@ -93,18 +94,21 @@ class _LoginPageState extends State<LoginPage> {
             padding: const EdgeInsets.all(24),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 420),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: AppColors.white,
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
-                  boxShadow: AppSpacing.shadowLg,
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(28, 28, 28, 28),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.white,
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
+                      boxShadow: AppSpacing.shadowLg,
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(28, 28, 28, 28),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
                       Align(
                         alignment: Alignment.center,
                         child: Image.asset(
@@ -231,9 +235,19 @@ class _LoginPageState extends State<LoginPage> {
                         loading: auth.loading,
                         onPressed: auth.loading ? null : _submit,
                       ),
-                    ],
+                        ],
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 16),
+                  Text(
+                    AppVersion.label,
+                    textAlign: TextAlign.center,
+                    style: AppTypography.textTheme.bodySmall?.copyWith(
+                      color: AppColors.slate500,
+                    ),
+                  ),
+                ],
               ).animate().fadeIn(duration: 280.ms).slideY(begin: 0.04, end: 0),
             ),
           ),

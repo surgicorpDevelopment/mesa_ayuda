@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../config/sistemas_catalog.dart';
+import '../models/app_user.dart';
 import '../models/models.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_colors.dart';
@@ -18,10 +19,12 @@ class TicketsListPage extends StatefulWidget {
     super.key,
     this.onlyAssignedToMe = false,
     this.onlyUnassigned = false,
+    this.initialBandeja,
   });
 
   final bool onlyAssignedToMe;
   final bool onlyUnassigned;
+  final String? initialBandeja;
 
   @override
   State<TicketsListPage> createState() => _TicketsListPageState();
@@ -31,10 +34,12 @@ class _TicketsListPageState extends State<TicketsListPage> {
   List<Ticket> _items = [];
   bool _loading = true;
   String? _error;
-  String? _estadoFilter;
+  /// null = vista agrupada. `por_aprobar` | `nuevos` | `en_curso` | `esperando` | `mios` | `resuelto` | `rechazado` | `cerrado`
+  String? _bandeja;
   String _query = '';
   int _countMine = 0;
   int _countUnassigned = 0;
+  int _countPorAprobar = 0;
   /// `recientes` | `prioridad_alta` | `prioridad_baja`
   String _sortBy = 'prioridad_alta';
 
@@ -81,6 +86,7 @@ class _TicketsListPageState extends State<TicketsListPage> {
   @override
   void initState() {
     super.initState();
+    _syncBandejaFromRoute();
     _load();
   }
 
@@ -88,8 +94,55 @@ class _TicketsListPageState extends State<TicketsListPage> {
   void didUpdateWidget(TicketsListPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.onlyAssignedToMe != widget.onlyAssignedToMe ||
-        oldWidget.onlyUnassigned != widget.onlyUnassigned) {
+        oldWidget.onlyUnassigned != widget.onlyUnassigned ||
+        oldWidget.initialBandeja != widget.initialBandeja) {
+      _syncBandejaFromRoute();
       _load();
+    }
+  }
+
+  void _syncBandejaFromRoute() {
+    if (widget.onlyUnassigned) {
+      _bandeja = 'nuevos';
+    } else if (widget.onlyAssignedToMe) {
+      _bandeja = 'mios';
+    } else if (widget.initialBandeja == 'por_aprobar') {
+      _bandeja = 'por_aprobar';
+    }
+  }
+
+  List<Ticket> _of(String bandeja, AppUser? user) {
+    switch (bandeja) {
+      case 'por_aprobar':
+      case 'revision':
+        return _items.where((t) => t.estado == 'por_aprobar').toList();
+      case 'nuevos':
+        final soloCola = user?.isDesarrollador == true && user?.isLider != true;
+        return _items.where((t) {
+          if (t.estado != 'nuevo') return false;
+          if (soloCola) return t.asignadoAId == null;
+          return true;
+        }).toList();
+      case 'mios':
+        return _items
+            .where((t) =>
+                t.asignadoAId == user?.id &&
+                (t.estado == 'nuevo' || t.estado == 'en_proceso'))
+            .toList();
+      case 'esperando':
+        return _items.where((t) => t.estado == 'esperando').toList();
+      case 'en_curso':
+        return _items
+            .where((t) => t.estado == 'en_proceso' || t.estado == 'esperando')
+            .toList();
+      case 'resuelto':
+        return _items.where((t) => t.estado == 'resuelto').toList();
+      case 'rechazado':
+        return _items.where((t) => t.estado == 'rechazado').toList();
+      case 'cerrado':
+        return _items.where((t) => t.estado == 'cerrado').toList();
+      default:
+        return _items;
     }
   }
 
@@ -100,24 +153,20 @@ class _TicketsListPageState extends State<TicketsListPage> {
     });
     try {
       final auth = context.read<AuthProvider>();
-      final filters = <String, String>{};
-      if (_estadoFilter != null) filters['estado'] = _estadoFilter!;
-      if (widget.onlyAssignedToMe && auth.user != null) {
-        filters['asignado_a'] = '${auth.user!.id}';
-      }
-
-      // Contadores de los chips: independientes del filtro activo.
       final inbox = await auth.api.fetchInbox();
       final countMine = inbox.asignadosAMi;
       final countUnassigned = inbox.colaSinAsignar;
+      final countPorAprobar = inbox.porAprobar;
 
-      var items = await auth.api.fetchTickets(filters: filters);
+      var items = await auth.api.fetchTickets();
       if (widget.onlyUnassigned) {
+        items = items.where((t) => t.estado == 'nuevo' && t.asignadoAId == null).toList();
+      } else if (widget.onlyAssignedToMe && auth.user != null) {
+        final uid = auth.user!.id;
         items = items
             .where((t) =>
-                t.asignadoAId == null &&
-                t.estado != 'resuelto' &&
-                t.estado != 'cerrado')
+                t.asignadoAId == uid &&
+                (t.estado == 'nuevo' || t.estado == 'en_proceso'))
             .toList();
       }
       if (_query.trim().isNotEmpty) {
@@ -135,6 +184,7 @@ class _TicketsListPageState extends State<TicketsListPage> {
           _items = items;
           _countMine = countMine;
           _countUnassigned = countUnassigned;
+          _countPorAprobar = countPorAprobar;
           _loading = false;
         });
       }
@@ -152,12 +202,49 @@ class _TicketsListPageState extends State<TicketsListPage> {
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().user;
     final isDev = user?.isDesarrollador == true;
-    final estados = [null, 'nuevo', 'en_proceso', 'esperando', 'resuelto', 'cerrado'];
+    final isLider = user?.isLider == true;
+    final isRegular = !isDev;
     final listTitle = widget.onlyUnassigned
         ? 'Cola sin asignar'
         : widget.onlyAssignedToMe
-            ? 'Mis abiertos'
+            ? 'Mis pendientes'
             : 'Tickets';
+
+    final cards = <_BandejaCard>[
+      if (isDev)
+        _BandejaCard('por_aprobar', 'Por aprobar', _countPorAprobar, AppColors.warning, AppColors.warningSoft)
+      else if (isRegular)
+        _BandejaCard('revision', 'En revisión', _of('revision', user).length, AppColors.warning, AppColors.warningSoft),
+      if (isDev && !isLider) ...[
+        _BandejaCard('nuevos', 'Nuevos sin asignar', _countUnassigned, AppColors.info, AppColors.infoSoft),
+        _BandejaCard('mios', 'Mis pendientes', _of('mios', user).length, AppColors.brand600, AppColors.brand50),
+        _BandejaCard('esperando', 'Esperando', _of('esperando', user).length, AppColors.purple, AppColors.purpleSoft),
+      ] else ...[
+        _BandejaCard('nuevos', 'Nuevos', _of('nuevos', user).length, AppColors.info, AppColors.infoSoft),
+        _BandejaCard('en_curso', 'En curso', _of('en_curso', user).length, AppColors.warning, AppColors.warningSoft),
+      ],
+      _BandejaCard(
+        'resuelto',
+        'Resuelto',
+        _of('resuelto', user).length,
+        AppColors.success,
+        AppColors.successSoft,
+      ),
+      _BandejaCard(
+        'rechazado',
+        'Rechazado',
+        _of('rechazado', user).length,
+        AppColors.danger,
+        AppColors.dangerSoft,
+      ),
+      _BandejaCard(
+        'cerrado',
+        'Cerrado',
+        _of('cerrado', user).length,
+        AppColors.slate700,
+        AppColors.slate100,
+      ),
+    ];
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -176,57 +263,32 @@ class _TicketsListPageState extends State<TicketsListPage> {
               children: [
                 SectionHeader(
                   title: listTitle,
-                  subtitle: '${_items.length} resultados',
+                  subtitle: _bandeja == null
+                      ? '${_items.length} resultados'
+                      : '${_of(_bandeja!, user).length} en esta bandeja',
                 ),
-                if (isDev) ...[
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+                const SizedBox(height: 12),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
                     children: [
-                      FilterChip(
-                        label: const Text('Todos'),
-                        selected: !widget.onlyAssignedToMe && !widget.onlyUnassigned,
-                        onSelected: (_) => context.go('/tickets'),
-                        selectedColor: AppColors.brand50,
-                        checkmarkColor: AppColors.brand600,
-                        labelStyle: AppTypography.textTheme.labelMedium?.copyWith(
-                          color: !widget.onlyAssignedToMe && !widget.onlyUnassigned
-                              ? AppColors.brand600
-                              : AppColors.slate700,
-                        ),
-                      ),
-                      Tooltip(
-                        message:
-                            'Asignados a ti en Nuevo, En proceso o Esperando.\nNo incluye resueltos ni cerrados.',
-                        child: FilterChip(
-                          label: Text('Mis abiertos ($_countMine)'),
-                          selected: widget.onlyAssignedToMe,
-                          onSelected: (_) => context.go('/tickets?mine=1'),
-                          selectedColor: AppColors.brand50,
-                          checkmarkColor: AppColors.brand600,
-                          labelStyle: AppTypography.textTheme.labelMedium?.copyWith(
-                            color: widget.onlyAssignedToMe
-                                ? AppColors.brand600
-                                : AppColors.slate700,
+                      for (final c in cards)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: _InboxTile(
+                            label: c.label,
+                            count: c.count,
+                            color: c.color,
+                            soft: c.soft,
+                            selected: _bandeja == c.id,
+                            onTap: () => setState(() {
+                              _bandeja = _bandeja == c.id ? null : c.id;
+                            }),
                           ),
                         ),
-                      ),
-                      FilterChip(
-                        label: Text('Sin asignar ($_countUnassigned)'),
-                        selected: widget.onlyUnassigned,
-                        onSelected: (_) => context.go('/tickets?unassigned=1'),
-                        selectedColor: AppColors.brand50,
-                        checkmarkColor: AppColors.brand600,
-                        labelStyle: AppTypography.textTheme.labelMedium?.copyWith(
-                          color: widget.onlyUnassigned
-                              ? AppColors.brand600
-                              : AppColors.slate700,
-                        ),
-                      ),
                     ],
                   ),
-                ],
+                ),
                 const SizedBox(height: 14),
                 Row(
                   children: [
@@ -281,31 +343,6 @@ class _TicketsListPageState extends State<TicketsListPage> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      for (final e in estados)
-                        Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: FilterChip(
-                            label: Text(e == null ? 'Todos' : labelEstado(e)),
-                            selected: _estadoFilter == e,
-                            onSelected: (_) {
-                              setState(() => _estadoFilter = e);
-                              _load();
-                            },
-                            selectedColor: AppColors.brand50,
-                            checkmarkColor: AppColors.brand600,
-                            labelStyle: AppTypography.textTheme.labelMedium?.copyWith(
-                              color: _estadoFilter == e ? AppColors.brand600 : AppColors.slate700,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
               ],
             ),
           ),
@@ -316,81 +353,267 @@ class _TicketsListPageState extends State<TicketsListPage> {
                   ? const AppSkeletonList()
                   : _error != null
                       ? ListView(children: [AppEmptyState(message: _error!, icon: Icons.error_outline)])
-                      : _items.isEmpty
-                          ? ListView(children: const [AppEmptyState(message: 'No hay tickets')])
-                          : ListView.separated(
-                              padding: const EdgeInsets.fromLTRB(24, 8, 24, 88),
-                              itemCount: _items.length,
-                              separatorBuilder: (_, __) => const SizedBox(height: 8),
-                              itemBuilder: (context, i) {
-                                final t = _items[i];
-                                return AppCard(
-                                  hoverable: true,
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                                  onTap: () => context.go('/tickets/${t.id}'),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        flex: 4,
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              t.titulo,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: AppTypography.textTheme.titleSmall,
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              t.sistemaAfectado.isEmpty
-                                                  ? 'Sin sistema'
-                                                  : SistemaAfectadoCatalog.labelFor(t.sistemaAfectado),
-                                              style: AppTypography.textTheme.bodySmall,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      Expanded(
-                                        flex: 2,
-                                        child: Row(
-                                          children: [
-                                            AppAvatar(
-                                              name: t.asignadoANombre ?? 'Sin asignar',
-                                              size: 28,
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Text(
-                                                t.asignadoANombre ?? 'Sin asignar',
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: AppTypography.textTheme.bodySmall,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      StatusBadge.estado(t.estado),
-                                      const SizedBox(width: 10),
-                                      PriorityIndicator(prioridad: t.prioridad),
-                                      const SizedBox(width: 12),
-                                      SizedBox(
-                                        width: 88,
-                                        child: Text(
-                                          formatRelative(t.fechaCreacion),
-                                          textAlign: TextAlign.right,
-                                          style: AppTypography.textTheme.bodySmall,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ).animate().fadeIn(delay: (20 * i).ms);
-                              },
-                            ),
+                      : _buildInbox(context, user, isLider, isRegular),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildInbox(BuildContext context, AppUser? user, bool isLider, bool isRegular) {
+    final sections = _bandeja == null
+        ? _sectionsFor(user, isLider, isRegular)
+        : [(label: _sectionTitle(_bandeja!), id: _bandeja!, tint: null as Color?)];
+    final children = <Widget>[];
+    for (final s in sections) {
+      var items = _of(s.id, user);
+      if (s.id == 'nuevos') {
+        items.sort((a, b) {
+          final da = a.fechaCreacion ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final db = b.fechaCreacion ?? DateTime.fromMillisecondsSinceEpoch(0);
+          return db.compareTo(da);
+        });
+      } else {
+        _applySort(items);
+      }
+      if (items.isEmpty && _bandeja == null) continue;
+      children.add(_sectionHeader(s.label, items.length, tint: s.tint));
+      if (items.isEmpty) {
+        children.add(const Padding(
+          padding: EdgeInsets.only(bottom: 12),
+          child: Text('Nada en esta bandeja'),
+        ));
+      }
+      for (final t in items) {
+        children.add(Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: _ticketRow(context, t, isRegular),
+        ));
+      }
+    }
+    if (children.isEmpty) {
+      return ListView(children: const [AppEmptyState(message: 'No hay tickets')]);
+    }
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 88),
+      children: children,
+    );
+  }
+
+  List<({String label, String id, Color? tint})> _sectionsFor(
+    AppUser? user,
+    bool isLider,
+    bool isRegular,
+  ) {
+    return [
+      if (!isRegular)
+        (label: 'Por aprobar', id: 'por_aprobar', tint: AppColors.warningSoft)
+      else if (isRegular)
+        (label: 'En revisión', id: 'revision', tint: AppColors.warningSoft),
+      (label: isLider || isRegular ? 'Nuevos' : 'Nuevos sin asignar', id: 'nuevos', tint: null),
+      if (isLider || isRegular)
+        (label: 'En curso', id: 'en_curso', tint: null)
+      else ...[
+        (label: 'Mis pendientes', id: 'mios', tint: null),
+        (label: 'Esperando', id: 'esperando', tint: null),
+      ],
+      (label: 'Resuelto', id: 'resuelto', tint: null),
+      (label: 'Rechazado', id: 'rechazado', tint: null),
+      (label: 'Cerrado', id: 'cerrado', tint: null),
+    ];
+  }
+
+  String _sectionTitle(String id) {
+    switch (id) {
+      case 'por_aprobar':
+        return 'Por aprobar';
+      case 'revision':
+        return 'En revisión';
+      case 'nuevos':
+        return 'Nuevos';
+      case 'en_curso':
+        return 'En curso';
+      case 'mios':
+        return 'Mis pendientes';
+      case 'esperando':
+        return 'Esperando';
+      case 'resuelto':
+        return 'Resuelto';
+      case 'rechazado':
+        return 'Rechazado';
+      case 'cerrado':
+        return 'Cerrado';
+      default:
+        return 'Tickets';
+    }
+  }
+
+  Widget _sectionHeader(String label, int count, {Color? tint, VoidCallback? onTap}) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 8),
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: tint ?? AppColors.slate100,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            '$label · $count',
+            style: AppTypography.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _ticketRow(BuildContext context, Ticket t, bool isRegular) {
+    final label = isRegular && t.estado == 'por_aprobar' ? 'En revisión' : labelEstado(t.estado);
+    final accent = estadoColor(t.estado);
+    return AppCard(
+      hoverable: true,
+      padding: EdgeInsets.zero,
+      onTap: () => context.go('/tickets/${t.id}'),
+      child: IntrinsicHeight(
+        child: Row(
+          children: [
+            Container(width: 4, color: accent),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 4,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            t.titulo,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.textTheme.titleSmall,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            t.sistemaAfectado.isEmpty
+                                ? 'Sin sistema'
+                                : SistemaAfectadoCatalog.labelFor(t.sistemaAfectado),
+                            style: AppTypography.textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child: Row(
+                        children: [
+                          AppAvatar(name: t.asignadoANombre ?? 'Sin asignar', size: 28),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              t.asignadoANombre ?? 'Sin asignar',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTypography.textTheme.bodySmall,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    StatusBadge(
+                      label: label,
+                      color: accent,
+                      softColor: estadoSoft(t.estado),
+                    ),
+                    const SizedBox(width: 10),
+                    PriorityIndicator(prioridad: t.prioridad),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: 88,
+                      child: Text(
+                        formatRelative(t.fechaCreacion),
+                        textAlign: TextAlign.right,
+                        style: AppTypography.textTheme.bodySmall?.copyWith(
+                          fontWeight: t.estado == 'nuevo' ? FontWeight.w700 : null,
+                          color: t.estado == 'nuevo' ? AppColors.info : null,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BandejaCard {
+  const _BandejaCard(this.id, this.label, this.count, this.color, this.soft);
+  final String id;
+  final String label;
+  final int count;
+  final Color color;
+  final Color soft;
+}
+
+class _InboxTile extends StatelessWidget {
+  const _InboxTile({
+    required this.label,
+    required this.count,
+    required this.color,
+    required this.soft,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final int count;
+  final Color color;
+  final Color soft;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? soft : AppColors.white,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          constraints: const BoxConstraints(minWidth: 148, maxWidth: 220),
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: selected ? color : AppColors.slate200, width: selected ? 1.5 : 1),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '$count',
+                style: AppTypography.textTheme.titleMedium?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                maxLines: 2,
+                style: AppTypography.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -804,6 +1027,154 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
     }
   }
 
+  bool _puedeAprobarTicket(AppUser user, Ticket t) {
+    return t.estado == 'por_aprobar' && user.isDesarrollador;
+  }
+
+  bool _puedeRechazarTicket(AppUser user, Ticket t) {
+    if (t.estado != 'por_aprobar') return false;
+    if (user.isGestor) return true;
+    return user.isLider && user.areaId != null && user.areaId == t.areaId;
+  }
+
+  Future<int?> _pedirAutorizacion(AppUser user) async {
+    final usuarios = await context.read<AuthProvider>().api.fetchAssignableUsers();
+    if (!mounted) return null;
+    final autorizadores = usuarios.where((u) {
+      final rol = (u.rol ?? '').toLowerCase();
+      return rol.contains('líder') || rol.contains('lider') || rol.contains('gestor');
+    }).toList();
+    var propio = true;
+    int? otroId = autorizadores.isEmpty ? null : autorizadores.first.id;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: const Text('¿Quién autoriza?'),
+          content: SizedBox(
+            width: 360,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                RadioListTile<bool>(
+                  value: true,
+                  groupValue: propio,
+                  title: const Text('Yo lo autorizo'),
+                  subtitle: const Text('Cambio técnico menor'),
+                  onChanged: (v) => setLocal(() => propio = v ?? true),
+                ),
+                RadioListTile<bool>(
+                  value: false,
+                  groupValue: propio,
+                  title: const Text('Lo autorizó un líder o gestor'),
+                  onChanged: autorizadores.isEmpty
+                      ? null
+                      : (v) => setLocal(() => propio = v ?? false),
+                ),
+                if (!propio)
+                  DropdownButtonFormField<int>(
+                    initialValue: otroId,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'Autorizó'),
+                    items: [
+                      for (final u in autorizadores)
+                        DropdownMenuItem(
+                          value: u.id,
+                          child: Text(
+                            '${u.fullName}${u.rol == null ? '' : ' · ${u.rol}'}',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                    onChanged: (v) => setLocal(() => otroId = v),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Aprobar'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (ok != true) return null;
+    return propio ? user.id : otroId;
+  }
+
+  Future<void> _aprobar() async {
+    final user = context.read<AuthProvider>().user;
+    int? autorizadoPorId;
+    if (user != null && !user.isLider) {
+      autorizadoPorId = await _pedirAutorizacion(user);
+      if (autorizadoPorId == null || !mounted) return;
+    }
+    try {
+      final t = await context.read<AuthProvider>().api.approveTicket(
+        widget.id,
+        autorizadoPorId: autorizadoPorId,
+      );
+      if (!mounted) return;
+      setState(() => _ticket = t);
+      await _loadHistorial();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ticket aprobado. Ya está en la cola.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
+  Future<void> _rechazar() async {
+    final ctrl = TextEditingController();
+    final motivo = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Rechazar ticket'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          minLines: 2,
+          maxLines: 4,
+          decoration: const InputDecoration(
+            labelText: 'Motivo',
+            hintText: 'Por qué no se aprueba',
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: const Text('Rechazar'),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (motivo == null || !mounted) return;
+    if (motivo.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('El motivo es obligatorio.')),
+      );
+      return;
+    }
+    try {
+      final t = await context.read<AuthProvider>().api.rejectTicket(widget.id, motivo);
+      if (!mounted) return;
+      setState(() => _ticket = t);
+      await _loadHistorial();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
   Future<void> _tomar() async {
     try {
       final t = await context.read<AuthProvider>().api.takeTicket(widget.id);
@@ -1062,6 +1433,10 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
                           Text('Detalles', style: AppTypography.textTheme.titleMedium),
                           const SizedBox(height: 14),
                           _DetailRow('Reportado por', _ticket!.reportadoPorNombre ?? '—'),
+                          if (_ticket!.aprobadoPorNombre != null)
+                            _DetailRow('Aprobado por', _ticket!.aprobadoPorNombre!),
+                          if (_ticket!.autorizadoPorNombre != null)
+                            _DetailRow('Autorizado por', _ticket!.autorizadoPorNombre!),
                           _DetailRow('Creado', formatDateTimeShort(_ticket!.fechaCreacion)),
                           _DetailRow('Atendido', formatDateTimeShort(historialHito(_historial, 'en_proceso'))),
                           _DetailRow('Resuelto', formatDateTimeShort(historialHito(_historial, 'resuelto'))),
@@ -1072,6 +1447,32 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
                             const SizedBox(height: 16),
                             const Divider(),
                             const SizedBox(height: 12),
+
+                            if (user != null &&
+                                _puedeAprobarTicket(user, _ticket!)) ...[
+                              Text(
+                                'Este ticket espera aprobación',
+                                style: AppTypography.textTheme.labelMedium,
+                              ),
+                              const SizedBox(height: 8),
+                              AppButton(
+                                label: 'Aprobar',
+                                icon: Icons.check_circle_outline,
+                                expanded: true,
+                                onPressed: _aprobar,
+                              ),
+                              if (_puedeRechazarTicket(user, _ticket!)) ...[
+                              const SizedBox(height: 8),
+                              AppButton(
+                                label: 'Rechazar',
+                                icon: Icons.cancel_outlined,
+                                variant: AppButtonVariant.danger,
+                                expanded: true,
+                                onPressed: _rechazar,
+                              ),
+                              ],
+                              const SizedBox(height: 16),
+                            ],
 
                             // ── Asignación ──────────────────────────────
                             Text('Asignado a', style: AppTypography.textTheme.labelMedium),
@@ -1106,7 +1507,10 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
                               ),
                             // Botón único: "Tomar ticket" si no asignado (avanza estado),
                             // "Asignarme" si asignado a otro, oculto si ya es mío.
-                            if (user != null && _ticket!.asignadoAId != user.id) ...[
+                            if (user != null &&
+                                _ticket!.asignadoAId != user.id &&
+                                _ticket!.estado != 'por_aprobar' &&
+                                _ticket!.estado != 'rechazado') ...[
                               const SizedBox(height: 10),
                               AppButton(
                                 label: _ticket!.asignadoAId == null
@@ -1127,7 +1531,7 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
 
                             const SizedBox(height: 16),
 
-                            // ── Estado ──────────────────────────────────
+                            if (_ticket!.estado != 'por_aprobar') ...[
                             Text('Estado', style: AppTypography.textTheme.labelMedium),
                             const SizedBox(height: 8),
                             Wrap(
@@ -1144,8 +1548,8 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
                                   ),
                               ],
                             ),
-
                             const SizedBox(height: 14),
+                            ],
 
                             // ── Prioridad e Impacto en fila ─────────────
                             Row(

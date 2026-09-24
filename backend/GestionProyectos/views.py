@@ -227,6 +227,8 @@ class GP_TicketViewSet(viewsets.ModelViewSet):
             serializer.validated_data.pop('impacto', None)
             serializer.validated_data.pop('asignado_a', None)
             serializer.validated_data.pop('estado', None)
+            # Usuario regular: el ticket espera aprobación de líder o gestor.
+            serializer.validated_data['estado'] = EstadoTicket.POR_APROBAR
         area_id = serializer.validated_data.get('area_id')
         if area_id is None:
             area_id = get_user_area_id(user)
@@ -271,15 +273,19 @@ class GP_TicketViewSet(viewsets.ModelViewSet):
         """Contadores para el home del frontend."""
         user = request.user
         base = self.get_queryset()
+        cerrados = ['resuelto', 'cerrado', 'rechazado']
         mis_abiertos = base.filter(
             reportado_por=user
-        ).exclude(estado__in=['resuelto', 'cerrado']).count()
+        ).exclude(estado__in=cerrados).count()
         asignados = base.filter(
             asignado_a=user
-        ).exclude(estado__in=['resuelto', 'cerrado']).count()
+        ).exclude(estado__in=cerrados).count()
         cola_sin_asignar = 0
         if is_desarrollador(user):
             cola_sin_asignar = base.filter(Q_COLA_SIN_ASIGNAR).count()
+        por_aprobar = 0
+        if is_desarrollador(user):
+            por_aprobar = base.filter(estado=EstadoTicket.POR_APROBAR).count()
         proyectos_activos = visible_proyectos(user).exclude(
             estado__in=['completado', 'cancelado']
         ).count()
@@ -288,6 +294,7 @@ class GP_TicketViewSet(viewsets.ModelViewSet):
                 'mis_tickets_abiertos': mis_abiertos,
                 'asignados_a_mi': asignados,
                 'cola_sin_asignar': cola_sin_asignar,
+                'por_aprobar': por_aprobar,
                 'proyectos_activos': proyectos_activos,
             }
         )
@@ -302,6 +309,16 @@ class GP_TicketViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
         ticket = self.get_object()
+        if ticket.estado in (
+            EstadoTicket.POR_APROBAR,
+            EstadoTicket.RECHAZADO,
+            EstadoTicket.RESUELTO,
+            EstadoTicket.CERRADO,
+        ):
+            return Response(
+                {'detail': 'Este ticket no está en la cola para tomar.'},
+                status=status.HTTP_409_CONFLICT,
+            )
         if ticket.asignado_a_id is not None:
             return Response(
                 {'detail': 'El ticket ya está asignado.'},
@@ -315,6 +332,100 @@ class GP_TicketViewSet(viewsets.ModelViewSet):
         _record_estado_change(
             TipoEntidad.TICKET, ticket.id, prev_estado, ticket.estado, user
         )
+        return Response(GP_TicketSerializer(ticket, context={'request': request}).data)
+
+    def _puede_rechazar(self, user, ticket):
+        """Rechazar sigue siendo solo gestor o líder del área."""
+        if is_gestor(user):
+            return True
+        if GROUP_LIDER_AREA not in user.groups.values_list('name', flat=True):
+            return False
+        area = get_user_area_id(user)
+        return area is not None and ticket.area_id == area
+
+    def _es_autorizador(self, user):
+        if user is None:
+            return False
+        if is_gestor(user):
+            return True
+        return GROUP_LIDER_AREA in user.groups.values_list('name', flat=True)
+
+    @action(detail=True, methods=['post'])
+    def aprobar(self, request, pk=None):
+        user = request.user
+        ticket = self.get_object()
+        if not is_desarrollador(user):
+            return Response(
+                {'detail': 'Solo el equipo de desarrollo, un líder o un gestor puede aprobar.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if ticket.estado != EstadoTicket.POR_APROBAR:
+            return Response(
+                {'detail': 'El ticket no está pendiente de aprobación.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+        raw = request.data.get('autorizado_por')
+        if is_lider(user) and raw in (None, ''):
+            autorizado = user
+        else:
+            try:
+                autorizado_id = int(raw)
+            except (TypeError, ValueError):
+                return Response(
+                    {'detail': 'Indica quién autoriza: tú o un líder/gestor.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            autorizado = User.objects.filter(pk=autorizado_id).first()
+            if autorizado is None:
+                return Response(
+                    {'detail': 'La persona que autoriza no existe.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if autorizado.id != user.id and not self._es_autorizador(autorizado):
+                return Response(
+                    {'detail': 'Solo puedes autorizar tú mismo o un líder de área o gestor.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        prev = ticket.estado
+        ticket.estado = EstadoTicket.NUEVO
+        ticket.aprobado_por = user
+        ticket.autorizado_por = autorizado
+        ticket.save(update_fields=[
+            'estado', 'aprobado_por', 'autorizado_por', 'fecha_actualizacion',
+        ])
+        _record_estado_change(TipoEntidad.TICKET, ticket.id, prev, ticket.estado, user)
+        return Response(GP_TicketSerializer(ticket, context={'request': request}).data)
+
+    @action(detail=True, methods=['post'])
+    def rechazar(self, request, pk=None):
+        user = request.user
+        ticket = self.get_object()
+        if not self._puede_rechazar(user, ticket):
+            return Response(
+                {'detail': 'Solo un gestor o el líder del área puede rechazar este ticket.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if ticket.estado != EstadoTicket.POR_APROBAR:
+            return Response(
+                {'detail': 'El ticket no está pendiente de aprobación.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+        motivo = str(request.data.get('comentario') or request.data.get('motivo') or '').strip()
+        if not motivo:
+            return Response(
+                {'detail': 'Indica el motivo del rechazo.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        prev = ticket.estado
+        ticket.estado = EstadoTicket.RECHAZADO
+        ticket.save(update_fields=['estado', 'fecha_actualizacion'])
+        GP_Comentario.objects.create(
+            tipo=TipoEntidad.TICKET,
+            ref_id=ticket.id,
+            autor=user,
+            cuerpo=motivo,
+        )
+        _record_estado_change(TipoEntidad.TICKET, ticket.id, prev, ticket.estado, user)
         return Response(GP_TicketSerializer(ticket, context={'request': request}).data)
 
     @action(
@@ -753,7 +864,7 @@ class GP_ProductividadViewSet(viewsets.ViewSet):
             ):
                 ranking_map[credit_id]['tickets_resueltos'] += 1
 
-            actividad.append({
+            actividad_item = {
                 'fecha': h.fecha.isoformat(),
                 'usuario_id': credit_id,
                 'usuario_nombre': credit_nombre,
@@ -762,7 +873,13 @@ class GP_ProductividadViewSet(viewsets.ViewSet):
                 'titulo': titulo,
                 'estado_anterior': h.estado_anterior,
                 'estado_nuevo': h.estado_nuevo,
-            })
+                'proyecto_id': None,
+            }
+            if h.tipo == TipoEntidad.TAREA:
+                tarea_ref = tareas.get(h.ref_id)
+                if tarea_ref is not None:
+                    actividad_item['proyecto_id'] = tarea_ref.proyecto_id
+            actividad.append(actividad_item)
 
         ranking = sorted(
             ranking_map.values(),

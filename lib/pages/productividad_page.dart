@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../models/models.dart';
@@ -310,88 +311,144 @@ class _TimelineTile extends StatelessWidget {
   final ProductividadEvento evento;
   final String relative;
 
+  String? get _destination {
+    if (evento.tipo == 'ticket') return '/tickets/${evento.refId}';
+    if (evento.tipo == 'tarea' && evento.proyectoId != null) {
+      return '/proyectos/${evento.proyectoId}?tab=tareas';
+    }
+    return null;
+  }
+
+  void _open(BuildContext context) {
+    final dest = _destination;
+    if (dest == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se pudo abrir esta tarea (falta el proyecto).'),
+        ),
+      );
+      return;
+    }
+    context.go(dest);
+  }
+
   @override
   Widget build(BuildContext context) {
     final isTarea = evento.tipo == 'tarea';
     final color = estadoColor(evento.estadoNuevo);
     final soft = estadoSoft(evento.estadoNuevo);
+    final canOpen = _destination != null;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: soft,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(
-              isTarea ? Icons.task_alt_rounded : Icons.confirmation_number_outlined,
-              size: 18,
-              color: color,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _open(context),
+          borderRadius: BorderRadius.circular(12),
+          hoverColor: AppColors.brand50.withValues(alpha: 0.65),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  evento.titulo,
-                  style: AppTypography.textTheme.titleSmall,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: soft,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    isTarea
+                        ? Icons.task_alt_rounded
+                        : Icons.confirmation_number_outlined,
+                    size: 18,
+                    color: color,
+                  ),
                 ),
-                const SizedBox(height: 4),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 4,
-                  crossAxisAlignment: WrapCrossAlignment.center,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        evento.titulo,
+                        style: AppTypography.textTheme.titleSmall?.copyWith(
+                          color: canOpen ? AppColors.brand600 : null,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text(
+                            evento.usuarioNombre ?? 'Sin usuario',
+                            style: AppTypography.textTheme.bodySmall?.copyWith(
+                              color: AppColors.slate500,
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: soft,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: color.withValues(alpha: 0.35),
+                              ),
+                            ),
+                            child: Text(
+                              labelEstado(evento.estadoNuevo),
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: color,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            isTarea ? 'Tarea' : 'Ticket',
+                            style: AppTypography.textTheme.labelSmall?.copyWith(
+                              color: AppColors.slate500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      evento.usuarioNombre ?? 'Sin usuario',
-                      style: AppTypography.textTheme.bodySmall?.copyWith(
-                        color: AppColors.slate500,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: soft,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: color.withValues(alpha: 0.35)),
-                      ),
-                      child: Text(
-                        labelEstado(evento.estadoNuevo),
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: color,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      isTarea ? 'Tarea' : 'Ticket',
+                      relative,
                       style: AppTypography.textTheme.labelSmall?.copyWith(
                         color: AppColors.slate500,
                       ),
                     ),
+                    if (canOpen) ...[
+                      const SizedBox(height: 6),
+                      Icon(
+                        Icons.open_in_new_rounded,
+                        size: 14,
+                        color: AppColors.brand600.withValues(alpha: 0.7),
+                      ),
+                    ],
                   ],
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          Text(
-            relative,
-            style: AppTypography.textTheme.labelSmall?.copyWith(
-              color: AppColors.slate500,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

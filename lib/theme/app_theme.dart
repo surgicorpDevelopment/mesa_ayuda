@@ -200,6 +200,8 @@ Color estadoColor(String e) {
     case 'idea':
     case 'pendiente':
       return AppColors.info;
+    case 'por_aprobar':
+      return AppColors.warning;
     case 'planificado':
       return AppColors.brand600;
     case 'en_proceso':
@@ -213,6 +215,7 @@ Color estadoColor(String e) {
     case 'hecho':
       return AppColors.success;
     case 'cancelado':
+    case 'rechazado':
       return AppColors.danger;
     case 'cerrado':
       return AppColors.slate500;
@@ -227,6 +230,8 @@ Color estadoSoft(String e) {
     case 'idea':
     case 'pendiente':
       return AppColors.infoSoft;
+    case 'por_aprobar':
+      return AppColors.warningSoft;
     case 'planificado':
       return AppColors.brand50;
     case 'en_proceso':
@@ -240,6 +245,7 @@ Color estadoSoft(String e) {
     case 'hecho':
       return AppColors.successSoft;
     case 'cancelado':
+    case 'rechazado':
       return AppColors.dangerSoft;
     case 'cerrado':
       return AppColors.slate100;
@@ -251,9 +257,11 @@ Color estadoSoft(String e) {
 String labelEstado(String e) {
   const map = {
     'nuevo': 'Nuevo',
+    'por_aprobar': 'Por aprobar',
     'en_proceso': 'En Proceso',
     'esperando': 'Esperando',
     'resuelto': 'Resuelto',
+    'rechazado': 'Rechazado',
     'cerrado': 'Cerrado',
     'idea': 'En Idea',
     'planificado': 'Planificado',

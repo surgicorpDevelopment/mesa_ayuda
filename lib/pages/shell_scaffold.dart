@@ -33,6 +33,13 @@ class _ShellScaffoldState extends State<ShellScaffold> {
       ),
       if (canSeeProyectos)
         const _NavItem(
+          'Tareas',
+          Icons.task_alt_outlined,
+          Icons.task_alt_rounded,
+          '/tareas',
+        ),
+      if (canSeeProyectos)
+        const _NavItem(
           'Proyectos',
           Icons.folder_outlined,
           Icons.folder_rounded,

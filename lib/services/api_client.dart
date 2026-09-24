@@ -448,7 +448,12 @@ class ApiClient {
   Future<Ticket> createTicket(Map<String, dynamic> body) async {
     if (ApiConfig.useMock) {
       await Future<void>.delayed(const Duration(milliseconds: 200));
-      return _mock.createTicket(body, userId: _userId, userName: _userName);
+      return _mock.createTicket(
+        body,
+        userId: _userId,
+        userName: _userName,
+        isDesarrollador: currentUser?.isDesarrollador ?? false,
+      );
     }
     // `adjuntos` es read_only en el serializer: se sube por multipart tras crear.
     final payload = Map<String, dynamic>.from(body)..remove('adjuntos');
@@ -605,6 +610,44 @@ class ApiClient {
       }
     }
     final data = await _post('${ApiConfig.ticketsPath}$id/tomar/', {});
+    return Ticket.fromJson(data);
+  }
+
+  Future<Ticket> approveTicket(int id, {int? autorizadoPorId}) async {
+    if (ApiConfig.useMock) {
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      final quien = autorizadoPorId ?? _userId;
+      return _mock.updateTicket(
+        id,
+        {
+          'estado': 'nuevo',
+          'aprobado_por_nombre': _userName,
+          'autorizado_por_nombre': _mock.nameForUser(quien) ?? _userName,
+        },
+        actorId: _userId,
+        actorName: _userName,
+      );
+    }
+    final data = await _post('${ApiConfig.ticketsPath}$id/aprobar/', {
+      if (autorizadoPorId != null) 'autorizado_por': autorizadoPorId,
+    });
+    return Ticket.fromJson(data);
+  }
+
+  Future<Ticket> rejectTicket(int id, String comentario) async {
+    if (ApiConfig.useMock) {
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      _mock.createComentario('ticket', id, comentario, userId: _userId, userName: _userName);
+      return _mock.updateTicket(
+        id,
+        {'estado': 'rechazado'},
+        actorId: _userId,
+        actorName: _userName,
+      );
+    }
+    final data = await _post('${ApiConfig.ticketsPath}$id/rechazar/', {
+      'comentario': comentario,
+    });
     return Ticket.fromJson(data);
   }
 

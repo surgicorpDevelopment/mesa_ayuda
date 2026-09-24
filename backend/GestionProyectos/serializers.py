@@ -175,10 +175,13 @@ class GP_TareaSerializer(serializers.ModelSerializer):
                     usuario_id = int(usuario_id)
                 except (TypeError, ValueError):
                     raise serializers.ValidationError('usuario_id debe ser un entero o nulo.')
+            cumplido_raw = item.get('cumplido', False)
+            cumplido = cumplido_raw in (True, 1, '1', 'true', 'True')
             cleaned.append({
                 'nombre': nombre,
                 'usuario_id': usuario_id,
                 'detalle': str(item.get('detalle') or '').strip(),
+                'cumplido': cumplido,
             })
         return cleaned
 
@@ -201,6 +204,8 @@ class GP_TicketAdjuntoSerializer(serializers.ModelSerializer):
 class GP_TicketSerializer(serializers.ModelSerializer):
     reportado_por_detail = UserMiniSerializer(source='reportado_por', read_only=True)
     asignado_a_detail = UserMiniSerializer(source='asignado_a', read_only=True)
+    aprobado_por_detail = UserMiniSerializer(source='aprobado_por', read_only=True)
+    autorizado_por_detail = UserMiniSerializer(source='autorizado_por', read_only=True)
     proyecto_titulo = serializers.CharField(source='proyecto.titulo', read_only=True, default=None)
     adjuntos = GP_TicketAdjuntoSerializer(many=True, read_only=True)
 
@@ -219,13 +224,23 @@ class GP_TicketSerializer(serializers.ModelSerializer):
             'reportado_por_detail',
             'asignado_a',
             'asignado_a_detail',
+            'aprobado_por',
+            'aprobado_por_detail',
+            'autorizado_por',
+            'autorizado_por_detail',
             'proyecto',
             'proyecto_titulo',
             'adjuntos',
             'fecha_creacion',
             'fecha_actualizacion',
         ]
-        read_only_fields = ['reportado_por', 'fecha_creacion', 'fecha_actualizacion']
+        read_only_fields = [
+            'reportado_por',
+            'aprobado_por',
+            'autorizado_por',
+            'fecha_creacion',
+            'fecha_actualizacion',
+        ]
 
 
 class GP_ComentarioSerializer(serializers.ModelSerializer):

@@ -114,6 +114,8 @@ class Ticket {
   final String? reportadoPorNombre;
   final int? asignadoAId;
   final String? asignadoANombre;
+  final String? aprobadoPorNombre;
+  final String? autorizadoPorNombre;
   final int? proyectoId;
   final String? proyectoTitulo;
   final DateTime? fechaCreacion;
@@ -133,6 +135,8 @@ class Ticket {
     this.reportadoPorNombre,
     this.asignadoAId,
     this.asignadoANombre,
+    this.aprobadoPorNombre,
+    this.autorizadoPorNombre,
     this.proyectoId,
     this.proyectoTitulo,
     this.fechaCreacion,
@@ -143,6 +147,8 @@ class Ticket {
   factory Ticket.fromJson(Map<String, dynamic> json) {
     final rep = json['reportado_por_detail'];
     final asg = json['asignado_a_detail'];
+    final apr = json['aprobado_por_detail'];
+    final aut = json['autorizado_por_detail'];
     final adjRaw = json['adjuntos'];
     final adjuntos = <TicketAdjunto>[];
     if (adjRaw is List) {
@@ -168,6 +174,12 @@ class Ticket {
       asignadoAId: json['asignado_a'] as int?,
       asignadoANombre: asg is Map
           ? ((asg['full_name'] ?? asg['username']) as String?)
+          : null,
+      aprobadoPorNombre: apr is Map
+          ? ((apr['full_name'] ?? apr['username']) as String?)
+          : null,
+      autorizadoPorNombre: aut is Map
+          ? ((aut['full_name'] ?? aut['username']) as String?)
           : null,
       proyectoId: json['proyecto'] as int?,
       proyectoTitulo: json['proyecto_titulo'] as String?,
@@ -269,12 +281,14 @@ class InboxStats {
   final int misTicketsAbiertos;
   final int asignadosAMi;
   final int colaSinAsignar;
+  final int porAprobar;
   final int proyectosActivos;
 
   const InboxStats({
     this.misTicketsAbiertos = 0,
     this.asignadosAMi = 0,
     this.colaSinAsignar = 0,
+    this.porAprobar = 0,
     this.proyectosActivos = 0,
   });
 
@@ -282,6 +296,7 @@ class InboxStats {
         misTicketsAbiertos: (json['mis_tickets_abiertos'] as int?) ?? 0,
         asignadosAMi: (json['asignados_a_mi'] as int?) ?? 0,
         colaSinAsignar: (json['cola_sin_asignar'] as int?) ?? 0,
+        porAprobar: (json['por_aprobar'] as int?) ?? 0,
         proyectosActivos: (json['proyectos_activos'] as int?) ?? 0,
       );
 }
@@ -291,14 +306,32 @@ class TareaEspera {
   final String nombre;
   final int? usuarioId;
   final String detalle;
+  /// True cuando esa persona ya entregó lo pedido.
+  final bool cumplido;
 
   const TareaEspera({
     required this.nombre,
     this.usuarioId,
     this.detalle = '',
+    this.cumplido = false,
   });
 
   bool get esExterno => usuarioId == null;
+
+  TareaEspera copyWith({
+    String? nombre,
+    int? usuarioId,
+    String? detalle,
+    bool? cumplido,
+    bool clearUsuarioId = false,
+  }) {
+    return TareaEspera(
+      nombre: nombre ?? this.nombre,
+      usuarioId: clearUsuarioId ? null : (usuarioId ?? this.usuarioId),
+      detalle: detalle ?? this.detalle,
+      cumplido: cumplido ?? this.cumplido,
+    );
+  }
 
   factory TareaEspera.fromJson(Map<String, dynamic> json) {
     final rawId = json['usuario_id'];
@@ -308,10 +341,16 @@ class TareaEspera {
     } else if (rawId != null) {
       usuarioId = int.tryParse('$rawId');
     }
+    final rawCumplido = json['cumplido'];
+    final cumplido = rawCumplido == true ||
+        rawCumplido == 1 ||
+        rawCumplido == '1' ||
+        rawCumplido == 'true';
     return TareaEspera(
       nombre: (json['nombre'] ?? '').toString().trim(),
       usuarioId: usuarioId,
       detalle: (json['detalle'] ?? '').toString().trim(),
+      cumplido: cumplido,
     );
   }
 
@@ -319,6 +358,7 @@ class TareaEspera {
         'nombre': nombre,
         'usuario_id': usuarioId,
         'detalle': detalle,
+        'cumplido': cumplido,
       };
 }
 
@@ -533,6 +573,8 @@ class ProductividadEvento {
   final String titulo;
   final String estadoAnterior;
   final String estadoNuevo;
+  /// Solo para tareas: proyecto al que pertenecen (para navegar al detalle).
+  final int? proyectoId;
 
   const ProductividadEvento({
     required this.fecha,
@@ -543,18 +585,29 @@ class ProductividadEvento {
     required this.titulo,
     this.estadoAnterior = '',
     required this.estadoNuevo,
+    this.proyectoId,
   });
 
-  factory ProductividadEvento.fromJson(Map<String, dynamic> json) => ProductividadEvento(
-        fecha: DateTime.tryParse((json['fecha'] ?? '') as String) ?? DateTime.now(),
-        usuarioId: json['usuario_id'] as int?,
-        usuarioNombre: json['usuario_nombre'] as String?,
-        tipo: (json['tipo'] ?? '') as String,
-        refId: json['ref_id'] as int,
-        titulo: (json['titulo'] ?? '') as String,
-        estadoAnterior: (json['estado_anterior'] ?? '') as String,
-        estadoNuevo: (json['estado_nuevo'] ?? '') as String,
-      );
+  factory ProductividadEvento.fromJson(Map<String, dynamic> json) {
+    final rawProyecto = json['proyecto_id'];
+    int? proyectoId;
+    if (rawProyecto is int) {
+      proyectoId = rawProyecto;
+    } else if (rawProyecto != null) {
+      proyectoId = int.tryParse('$rawProyecto');
+    }
+    return ProductividadEvento(
+      fecha: DateTime.tryParse((json['fecha'] ?? '') as String) ?? DateTime.now(),
+      usuarioId: json['usuario_id'] as int?,
+      usuarioNombre: json['usuario_nombre'] as String?,
+      tipo: (json['tipo'] ?? '') as String,
+      refId: json['ref_id'] as int,
+      titulo: (json['titulo'] ?? '') as String,
+      estadoAnterior: (json['estado_anterior'] ?? '') as String,
+      estadoNuevo: (json['estado_nuevo'] ?? '') as String,
+      proyectoId: proyectoId,
+    );
+  }
 }
 
 /// Respuesta del endpoint de productividad.

@@ -18,10 +18,12 @@ class EstadoProyecto(models.TextChoices):
 
 
 class EstadoTicket(models.TextChoices):
+    POR_APROBAR = 'por_aprobar', 'Por aprobar'
     NUEVO = 'nuevo', 'Nuevo'
     EN_PROCESO = 'en_proceso', 'En Proceso'
     ESPERANDO = 'esperando', 'Esperando'
     RESUELTO = 'resuelto', 'Resuelto'
+    RECHAZADO = 'rechazado', 'Rechazado'
     CERRADO = 'cerrado', 'Cerrado'
 
 
@@ -163,6 +165,22 @@ class GP_Ticket(models.Model):
         blank=True,
         related_name='gp_tickets_asignados',
     )
+    aprobado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='gp_tickets_aprobados',
+        help_text='Quien pulsó Aprobar.',
+    )
+    autorizado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='gp_tickets_autorizados',
+        help_text='Quien autorizó: el mismo aprobador o un líder/gestor.',
+    )
     proyecto = models.ForeignKey(
         GP_Proyecto,
         on_delete=models.SET_NULL,
@@ -291,7 +309,7 @@ class GP_Tarea(models.Model):
     esperando = models.JSONField(
         default=list,
         blank=True,
-        help_text='Personas de las que depende la tarea: [{nombre, usuario_id?, detalle}, ...]',
+        help_text='Personas de las que depende la tarea: [{nombre, usuario_id?, detalle, cumplido?}, ...]',
     )
     orden = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)

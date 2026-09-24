@@ -166,61 +166,49 @@ class _HomePageState extends State<HomePage> {
             )
           else ...[
             Wrap(
-              spacing: 12,
-              runSpacing: 12,
+              spacing: 8,
+              runSpacing: 8,
               children: [
-                _MetricCard(
-                  title: 'Mis tickets abiertos',
-                  value: '${_stats?.misTicketsAbiertos ?? 0}',
-                  icon: Icons.bug_report_outlined,
-                  tint: AppColors.accent,
-                  soft: AppColors.accentSoft,
-                  onTap: () => context.go('/tickets'),
-                ),
                 if (user?.isDesarrollador == true) ...[
-                  _MetricCard(
-                    title: 'Cola sin asignar',
-                    value: '${_stats?.colaSinAsignar ?? 0}',
-                    icon: Icons.inbox_outlined,
-                    tint: AppColors.accent,
-                    soft: AppColors.accentSoft,
+                  _HomeTile(
+                    label: 'Por aprobar',
+                    count: _stats?.porAprobar ?? 0,
+                    color: AppColors.warning,
+                    onTap: () => context.go('/tickets?bandeja=por_aprobar'),
+                  ),
+                  _HomeTile(
+                    label: 'Nuevos',
+                    count: _stats?.colaSinAsignar ?? 0,
+                    color: AppColors.info,
                     onTap: () => context.go('/tickets?unassigned=1'),
                   ),
-                  _MetricCard(
-                    title: 'Mis abiertos',
-                    value: '${_stats?.asignadosAMi ?? 0}',
-                    icon: Icons.assignment_ind_outlined,
-                    tint: AppColors.brand600,
-                    soft: AppColors.brand50,
+                  _HomeTile(
+                    label: 'Asignados a mí',
+                    count: _stats?.asignadosAMi ?? 0,
+                    color: AppColors.brand600,
                     onTap: () => context.go('/tickets?mine=1'),
                   ),
-                  _MetricCard(
-                    title: 'Tareas pendientes',
-                    value: '$_tareasPendientes',
-                    icon: Icons.pending_actions_outlined,
-                    tint: AppColors.info,
-                    soft: AppColors.infoSoft,
+                  _HomeTile(
+                    label: 'Tareas pendientes',
+                    count: _tareasPendientes,
+                    color: AppColors.info,
                     onTap: () => context.go('/tareas?estado=pendiente'),
                   ),
-                  _MetricCard(
-                    title: 'Tareas en progreso',
-                    value: '$_tareasEnProgreso',
-                    icon: Icons.play_circle_outline,
-                    tint: AppColors.warning,
-                    soft: AppColors.warningSoft,
+                  _HomeTile(
+                    label: 'Tareas en progreso',
+                    count: _tareasEnProgreso,
+                    color: AppColors.warning,
                     onTap: () => context.go('/tareas?estado=en_progreso'),
                   ),
-                  _MetricCard(
-                    title: 'Proyectos activos',
-                    value: '${_stats?.proyectosActivos ?? 0}',
-                    icon: Icons.folder_open_outlined,
-                    tint: AppColors.purple,
-                    soft: AppColors.purpleSoft,
-                    onTap: () => context.go('/proyectos'),
+                ] else
+                  _HomeTile(
+                    label: 'Reportados por mí',
+                    count: _stats?.misTicketsAbiertos ?? 0,
+                    color: AppColors.brand600,
+                    onTap: () => context.go('/tickets'),
                   ),
-                ],
               ],
-            ).animate().fadeIn(duration: 250.ms).slideY(begin: 0.03, end: 0),
+            ).animate().fadeIn(duration: 250.ms),
             const SizedBox(height: 20),
             Row(
               children: [
@@ -388,47 +376,56 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-class _MetricCard extends StatelessWidget {
-  const _MetricCard({
-    required this.title,
-    required this.value,
-    required this.icon,
-    required this.tint,
-    required this.soft,
+class _HomeTile extends StatelessWidget {
+  const _HomeTile({
+    required this.label,
+    required this.count,
+    required this.color,
     required this.onTap,
   });
 
-  final String title;
-  final String value;
-  final IconData icon;
-  final Color tint;
-  final Color soft;
+  final String label;
+  final int count;
+  final Color color;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 240,
-      child: AppCard(
-        hoverable: true,
+    final quiet = count == 0;
+    return Material(
+      color: AppColors.white,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
         onTap: onTap,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: soft,
-                borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          constraints: const BoxConstraints(minWidth: 148, maxWidth: 220),
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.slate200),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '$count',
+                style: AppTypography.textTheme.titleMedium?.copyWith(
+                  color: quiet ? AppColors.slate300 : color,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
-              child: Icon(icon, color: tint, size: 20),
-            ),
-            const SizedBox(height: 14),
-            Text(value, style: AppTypography.textTheme.headlineMedium),
-            const SizedBox(height: 4),
-            Text(title, style: AppTypography.textTheme.bodySmall),
-          ],
+              const SizedBox(height: 2),
+              Text(
+                label,
+                maxLines: 2,
+                style: AppTypography.textTheme.labelSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: quiet ? AppColors.slate300 : null,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

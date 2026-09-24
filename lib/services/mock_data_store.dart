@@ -635,16 +635,21 @@ class MockDataStore {
         .where((t) =>
             t.reportadoPorId == userId &&
             t.estado != 'resuelto' &&
-            t.estado != 'cerrado')
+            t.estado != 'cerrado' &&
+            t.estado != 'rechazado')
         .length;
     final asignados = tickets
         .where((t) =>
             t.asignadoAId == userId &&
             t.estado != 'resuelto' &&
-            t.estado != 'cerrado')
+            t.estado != 'cerrado' &&
+            t.estado != 'rechazado')
         .length;
     final colaSinAsignar = isDesarrollador
         ? tickets.where(_esColaSinAsignar).length
+        : 0;
+    final porAprobar = (isDesarrollador || isLider || isGestor)
+        ? tickets.where((t) => t.estado == 'por_aprobar').length
         : 0;
     final proyectosActivos = _visibleProyectos(
       userId: userId,
@@ -657,13 +662,18 @@ class MockDataStore {
       misTicketsAbiertos: misAbiertos,
       asignadosAMi: asignados,
       colaSinAsignar: colaSinAsignar,
+      porAprobar: porAprobar,
       proyectosActivos: proyectosActivos,
     );
   }
 
   /// Equivalente a `Q_COLA_SIN_ASIGNAR` del backend.
   bool _esColaSinAsignar(Ticket t) =>
-      t.asignadoAId == null && t.estado != 'resuelto' && t.estado != 'cerrado';
+      t.asignadoAId == null &&
+      t.estado != 'resuelto' &&
+      t.estado != 'cerrado' &&
+      t.estado != 'por_aprobar' &&
+      t.estado != 'rechazado';
 
   /// Replica la lógica de visibilidad del backend Django.
   ///
@@ -688,6 +698,7 @@ class MockDataStore {
           if (t.asignadoAId == userId) return true;
           if (t.reportadoPorId == userId) return true;
           if (_esColaSinAsignar(t)) return true;
+          if (t.estado == 'por_aprobar') return true;
           if (userAreaId != null && t.areaId == userAreaId) return true;
           return false;
         }).toList();
@@ -733,7 +744,12 @@ class MockDataStore {
     historial.removeWhere((e) => e.tipo == 'ticket' && e.refId == id);
   }
 
-  Ticket createTicket(Map<String, dynamic> body, {required int userId, required String userName}) {
+  Ticket createTicket(
+    Map<String, dynamic> body, {
+    required int userId,
+    required String userName,
+    bool isDesarrollador = true,
+  }) {
     _ticketSeq += 1;
     final adjuntos = <TicketAdjunto>[];
     final raw = body['adjuntos'];
@@ -752,7 +768,7 @@ class MockDataStore {
       descripcion: (body['descripcion'] ?? '') as String,
       areaId: body['area_id'] as int?,
       sistemaAfectado: (body['sistema_afectado'] ?? '') as String,
-      estado: (body['estado'] ?? 'nuevo') as String,
+      estado: isDesarrollador ? ((body['estado'] ?? 'nuevo') as String) : 'por_aprobar',
       prioridad: (body['prioridad'] ?? 'media') as String,
       impacto: (body['impacto'] ?? 'media') as String,
       reportadoPorId: userId,
@@ -843,6 +859,12 @@ class MockDataStore {
       reportadoPorNombre: cur.reportadoPorNombre,
       asignadoAId: newAsignadoId,
       asignadoANombre: newAsignadoNombre,
+      aprobadoPorNombre: body.containsKey('aprobado_por_nombre')
+          ? body['aprobado_por_nombre'] as String?
+          : cur.aprobadoPorNombre,
+      autorizadoPorNombre: body.containsKey('autorizado_por_nombre')
+          ? body['autorizado_por_nombre'] as String?
+          : cur.autorizadoPorNombre,
       proyectoId: body.containsKey('proyecto') ? body['proyecto'] as int? : cur.proyectoId,
       proyectoTitulo: cur.proyectoTitulo,
       fechaCreacion: cur.fechaCreacion,
@@ -871,6 +893,12 @@ class MockDataStore {
     final cur = getTicket(id);
     if (cur.asignadoAId != null) {
       throw StateError('El ticket ya está asignado');
+    }
+    if (cur.estado == 'por_aprobar' ||
+        cur.estado == 'rechazado' ||
+        cur.estado == 'resuelto' ||
+        cur.estado == 'cerrado') {
+      throw StateError('Este ticket no está en la cola para tomar');
     }
     return updateTicket(
       id,
@@ -1068,6 +1096,8 @@ class MockDataStore {
           reportadoPorNombre: t.reportadoPorNombre,
           asignadoAId: t.asignadoAId,
           asignadoANombre: t.asignadoANombre,
+          aprobadoPorNombre: t.aprobadoPorNombre,
+          autorizadoPorNombre: t.autorizadoPorNombre,
           proyectoId: null,
           proyectoTitulo: null,
           fechaCreacion: t.fechaCreacion,
@@ -1162,6 +1192,7 @@ class MockDataStore {
       estadoNuevo: tarea.estado,
       usuarioId: tarea.asignadoAId ?? actorId,
       usuarioNombre: tarea.asignadoANombre ?? actorName,
+      proyectoId: tarea.proyectoId,
     );
     return tarea;
   }
@@ -1199,6 +1230,7 @@ class MockDataStore {
         estadoNuevo: newEstado,
         usuarioId: updated.asignadoAId ?? actorId,
         usuarioNombre: updated.asignadoANombre ?? actorName,
+        proyectoId: updated.proyectoId,
       );
     }
     return updated;
@@ -1216,6 +1248,7 @@ class MockDataStore {
     required String estadoNuevo,
     required int? usuarioId,
     required String? usuarioNombre,
+    int? proyectoId,
   }) {
     if (estadoAnterior == estadoNuevo) return;
     historial.insert(
@@ -1229,6 +1262,7 @@ class MockDataStore {
         titulo: titulo,
         estadoAnterior: estadoAnterior,
         estadoNuevo: estadoNuevo,
+        proyectoId: proyectoId,
       ),
     );
   }
@@ -1260,18 +1294,17 @@ class MockDataStore {
             break;
           }
         }
-        if (t?.asignadoAId != null) {
-          return ProductividadEvento(
-            fecha: e.fecha,
-            usuarioId: t!.asignadoAId,
-            usuarioNombre: t.asignadoANombre,
-            tipo: e.tipo,
-            refId: e.refId,
-            titulo: e.titulo,
-            estadoAnterior: e.estadoAnterior,
-            estadoNuevo: e.estadoNuevo,
-          );
-        }
+        return ProductividadEvento(
+          fecha: e.fecha,
+          usuarioId: t?.asignadoAId ?? e.usuarioId,
+          usuarioNombre: t?.asignadoANombre ?? e.usuarioNombre,
+          tipo: e.tipo,
+          refId: e.refId,
+          titulo: e.titulo,
+          estadoAnterior: e.estadoAnterior,
+          estadoNuevo: e.estadoNuevo,
+          proyectoId: t?.proyectoId ?? e.proyectoId,
+        );
       } else if (e.tipo == 'ticket') {
         Ticket? t;
         for (final x in tickets) {
@@ -1290,6 +1323,7 @@ class MockDataStore {
             titulo: e.titulo,
             estadoAnterior: e.estadoAnterior,
             estadoNuevo: e.estadoNuevo,
+            proyectoId: e.proyectoId,
           );
         }
       }
