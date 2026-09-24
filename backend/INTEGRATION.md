@@ -180,8 +180,12 @@ Content-Type: application/json
   los ViewSets usan `filterset_fields`, `search_fields` y `ordering_fields`.
 - Paginación global de DRF: el cliente lee `results` pero ignora `next`. Si hay
   paginación, revisar que el tamaño de página cubra las listas del MVP.
-- `MEDIA_ROOT` con permiso de escritura para el usuario del application pool en
-  `gp_tickets/` y `gp_proyectos/`, y `/media/` servido por IIS.
-- Las URLs de adjuntos salen de `request.build_absolute_uri`: deben resolver a
-  `https://appsurgicorperu.com/...` y no a `localhost`.
+- IIS no sirve una carpeta `media/`. El StaticFileModule expone `NewAPI/static/`.
+  Los `FileField` guardan en
+  `NewAPI/static/GestionProyectos/gp_tickets/%Y/%m/` y
+  `NewAPI/static/GestionProyectos/gp_proyectos/%Y/%m/`, relativo a la raíz
+  del proyecto Django (`D:\DjangoNewAPI`). El application pool necesita
+  escritura en esas carpetas.
+- Las URLs de adjuntos salen de `request.build_absolute_uri` y deben resolver a
+  `https://appsurgicorperu.com/NewAPI/static/GestionProyectos/...`.
 - `maxAllowedContentLength` de IIS (30 MB por defecto) para las capturas.

@@ -261,7 +261,9 @@ class GP_TicketAdjunto(models.Model):
         related_name='adjuntos',
     )
     nombre = models.CharField(max_length=255)
-    archivo = models.FileField(upload_to='gp_tickets/%Y/%m/')
+    archivo = models.FileField(
+        upload_to='NewAPI/static/GestionProyectos/gp_tickets/%Y/%m/',
+    )
     mime_type = models.CharField(max_length=100, blank=True, default='')
     size_bytes = models.PositiveIntegerField(default=0)
     subido_por = models.ForeignKey(
@@ -334,7 +336,9 @@ class GP_ProyectoAdjunto(models.Model):
         related_name='adjuntos',
     )
     nombre = models.CharField(max_length=255)
-    archivo = models.FileField(upload_to='gp_proyectos/%Y/%m/')
+    archivo = models.FileField(
+        upload_to='NewAPI/static/GestionProyectos/gp_proyectos/%Y/%m/',
+    )
     mime_type = models.CharField(max_length=100, blank=True, default='')
     size_bytes = models.PositiveIntegerField(default=0)
     subido_por = models.ForeignKey(

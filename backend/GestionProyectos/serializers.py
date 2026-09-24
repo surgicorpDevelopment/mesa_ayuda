@@ -11,6 +11,15 @@ User = get_user_model()
 _AREA_CACHE = {}
 
 
+def _absolute_media_path(url):
+    """IIS sirve NewAPI/static desde la raíz del sitio. Sin barra inicial,
+    build_absolute_uri la cuelga de la ruta del endpoint y el enlace da 404.
+    """
+    if not url or url.startswith(('http://', 'https://', '/')):
+        return url
+    return '/' + url
+
+
 def _area_nombre(area_id):
     """Resuelve EU_Area.nombre sin acoplar GestionProyectos a un app label fijo."""
     if area_id is None:
@@ -67,7 +76,7 @@ class GP_ProyectoAdjuntoSerializer(serializers.ModelSerializer):
     def get_url(self, obj):
         request = self.context.get('request')
         if request and obj.archivo:
-            return request.build_absolute_uri(obj.archivo.url)
+            return request.build_absolute_uri(_absolute_media_path(obj.archivo.url))
         return None
 
 
@@ -197,7 +206,7 @@ class GP_TicketAdjuntoSerializer(serializers.ModelSerializer):
     def get_url(self, obj):
         request = self.context.get('request')
         if request and obj.archivo:
-            return request.build_absolute_uri(obj.archivo.url)
+            return request.build_absolute_uri(_absolute_media_path(obj.archivo.url))
         return None
 
 
