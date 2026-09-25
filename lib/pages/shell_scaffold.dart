@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../config/api_config.dart';
+import '../config/app_version.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
@@ -453,6 +454,14 @@ class _Topbar extends StatelessWidget {
             style: AppTypography.textTheme.titleLarge?.copyWith(
               color: AppColors.shellTopbarTitle,
               fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            AppVersion.labelWithBuild,
+            style: AppTypography.textTheme.labelSmall?.copyWith(
+              color: AppColors.shellTopbarTitle.withValues(alpha: 0.55),
+              fontWeight: FontWeight.w600,
             ),
           ),
           if (ApiConfig.useMock) ...[

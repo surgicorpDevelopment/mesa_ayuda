@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../config/app_version.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
@@ -86,6 +87,12 @@ class PerfilPage extends StatelessWidget {
                       ),
                     ),
                 ],
+              ),
+              const SizedBox(height: 16),
+              _InfoTile(
+                icon: Icons.info_outline,
+                label: 'Versión de la app',
+                value: AppVersion.labelWithBuild,
               ),
             ],
           ),

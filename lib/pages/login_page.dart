@@ -241,7 +241,7 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    AppVersion.label,
+                    AppVersion.labelWithBuild,
                     textAlign: TextAlign.center,
                     style: AppTypography.textTheme.bodySmall?.copyWith(
                       color: AppColors.slate500,
