@@ -5,7 +5,7 @@ WORKDIR /app
 COPY pubspec.yaml pubspec.lock ./
 RUN flutter pub get
 COPY . .
-RUN flutter build web --release --base-href /app_mesaayuda/
+RUN flutter build web --release --base-href /app_mesaayuda/ --no-tree-shake-icons
 
 FROM nginx:1.27-alpine
 COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf

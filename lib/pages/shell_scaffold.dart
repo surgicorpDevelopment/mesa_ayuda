@@ -35,8 +35,10 @@ class _ShellScaffoldState extends State<ShellScaffold> {
       if (canSeeProyectos)
         const _NavItem(
           'Tareas',
-          Icons.assignment_outlined,
-          Icons.assignment,
+          // task_alt_rounded también se usa en Icon(...) de Reportes/Inicio;
+          // así el tree-shake del build web release no lo elimina del font.
+          Icons.task_alt_rounded,
+          Icons.task_alt_rounded,
           '/tareas',
         ),
       if (canSeeProyectos)

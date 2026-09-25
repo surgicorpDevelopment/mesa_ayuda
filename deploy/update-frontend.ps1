@@ -32,7 +32,7 @@ Write-Host "==> flutter pub get" -ForegroundColor Cyan
 flutter pub get
 
 Write-Host "==> flutter build web (host)" -ForegroundColor Cyan
-flutter build web --release --base-href /app_mesaayuda/ --pwa-strategy=none --no-wasm-dry-run
+flutter build web --release --base-href /app_mesaayuda/ --pwa-strategy=none --no-wasm-dry-run --no-tree-shake-icons
 
 $webIndex = Join-Path $RepoRoot "build\web\index.html"
 $webAssets = Join-Path $RepoRoot "build\web\assets\FontManifest.json"
