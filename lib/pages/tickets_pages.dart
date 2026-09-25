@@ -34,7 +34,7 @@ class _TicketsListPageState extends State<TicketsListPage> {
   List<Ticket> _items = [];
   bool _loading = true;
   String? _error;
-  /// null = vista agrupada. `por_aprobar` | `nuevos` | `en_curso` | `esperando` | `mios` | `resuelto` | `rechazado` | `cerrado`
+  /// null = vista agrupada. `por_aprobar` | `nuevos` | `en_progreso` | `esperando` | `mios` | `resuelto` | `rechazado` | `cerrado`
   String? _bandeja;
   String _query = '';
   int _countMine = 0;
@@ -132,11 +132,8 @@ class _TicketsListPageState extends State<TicketsListPage> {
             .toList();
       case 'esperando':
         return _items.where((t) => t.estado == 'esperando').toList();
-      case 'en_curso':
-        return _items
-            .where((t) => t.estado == 'en_proceso' || t.estado == 'esperando')
-            .toList();
       case 'en_progreso':
+      case 'en_curso': // alias legacy de la ruta/home
         return _items
             .where((t) =>
                 t.asignadoAId == user?.id &&
@@ -225,10 +222,23 @@ class _TicketsListPageState extends State<TicketsListPage> {
       if (isDev && !isLider) ...[
         _BandejaCard('nuevos', 'Nuevos sin asignar', _countUnassigned, AppColors.info, AppColors.infoSoft),
         _BandejaCard('mios', 'Mis pendientes', _of('mios', user).length, AppColors.brand600, AppColors.brand50),
+        _BandejaCard(
+          'en_progreso',
+          'Tickets en progreso',
+          _of('en_progreso', user).length,
+          AppColors.warning,
+          AppColors.warningSoft,
+        ),
         _BandejaCard('esperando', 'Esperando', _of('esperando', user).length, AppColors.purple, AppColors.purpleSoft),
       ] else ...[
         _BandejaCard('nuevos', 'Nuevos', _of('nuevos', user).length, AppColors.info, AppColors.infoSoft),
-        _BandejaCard('en_curso', 'En curso', _of('en_curso', user).length, AppColors.warning, AppColors.warningSoft),
+        _BandejaCard(
+          'en_progreso',
+          'Tickets en progreso',
+          _of('en_progreso', user).length,
+          AppColors.warning,
+          AppColors.warningSoft,
+        ),
       ],
       _BandejaCard(
         'resuelto',
@@ -420,9 +430,10 @@ class _TicketsListPageState extends State<TicketsListPage> {
         (label: 'En revisión', id: 'revision', tint: AppColors.warningSoft),
       (label: isLider || isRegular ? 'Nuevos' : 'Nuevos sin asignar', id: 'nuevos', tint: null),
       if (isLider || isRegular)
-        (label: 'En curso', id: 'en_curso', tint: null)
+        (label: 'Tickets en progreso', id: 'en_progreso', tint: null)
       else ...[
         (label: 'Mis pendientes', id: 'mios', tint: null),
+        (label: 'Tickets en progreso', id: 'en_progreso', tint: null),
         (label: 'Esperando', id: 'esperando', tint: null),
       ],
       (label: 'Resuelto', id: 'resuelto', tint: null),
@@ -440,7 +451,6 @@ class _TicketsListPageState extends State<TicketsListPage> {
       case 'nuevos':
         return 'Nuevos';
       case 'en_curso':
-        return 'En curso';
       case 'en_progreso':
         return 'Tickets en progreso';
       case 'mios':
