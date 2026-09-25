@@ -27,15 +27,15 @@ class _ShellScaffoldState extends State<ShellScaffold> {
       const _NavItem('Inicio', Icons.home_outlined, Icons.home_rounded, '/'),
       const _NavItem(
         'Tickets',
-        Icons.confirmation_number_outlined,
+        Icons.confirmation_number,
         Icons.confirmation_number,
         '/tickets',
       ),
       if (canSeeProyectos)
         const _NavItem(
           'Tareas',
-          Icons.checklist_outlined,
-          Icons.checklist_rounded,
+          Icons.assignment_outlined,
+          Icons.assignment,
           '/tareas',
         ),
       if (canSeeProyectos)

@@ -24,23 +24,29 @@ class _HomePageState extends State<HomePage> {
   Map<int, String> _proyectoTitulos = {};
   String? _error;
   bool _loading = true;
+  int? _loadedForUserId;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
   Future<void> _load() async {
+    final auth = context.read<AuthProvider>();
+    final user = auth.user;
+    if (user == null) {
+      if (mounted) setState(() => _loading = false);
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final auth = context.read<AuthProvider>();
       final api = auth.api;
-      final userId = auth.user?.id;
-      final isDev = auth.user?.isDesarrollador == true;
+      final userId = user.id;
+      final isDev = user.isDesarrollador;
       final stats = await api.fetchInbox();
       final tickets = await api.fetchTickets();
 
@@ -48,21 +54,24 @@ class _HomePageState extends State<HomePage> {
       // Usuario final: incidencias que yo reporté y siguen abiertas.
       final misTickets =
           tickets.where((t) {
-            final abierto = t.estado != 'resuelto' && t.estado != 'cerrado';
+            final abierto = t.estado != 'resuelto' &&
+                t.estado != 'cerrado' &&
+                t.estado != 'rechazado';
             if (!abierto) return false;
-            if (isDev && userId != null) return t.asignadoAId == userId;
+            if (isDev) return t.asignadoAId == userId;
             return t.reportadoPorId == userId;
-          }).toList()..sort((a, b) {
-            final da =
-                a.fechaActualizacion ?? DateTime.fromMillisecondsSinceEpoch(0);
-            final db =
-                b.fechaActualizacion ?? DateTime.fromMillisecondsSinceEpoch(0);
-            return db.compareTo(da);
-          });
+          }).toList()
+            ..sort((a, b) {
+              final da = a.fechaActualizacion ??
+                  DateTime.fromMillisecondsSinceEpoch(0);
+              final db = b.fechaActualizacion ??
+                  DateTime.fromMillisecondsSinceEpoch(0);
+              return db.compareTo(da);
+            });
 
       var misTareas = <Tarea>[];
       var titulos = <int, String>{};
-      if (isDev && userId != null) {
+      if (isDev) {
         final allTareas = await api.fetchTareas();
         misTareas =
             allTareas
@@ -77,11 +86,9 @@ class _HomePageState extends State<HomePage> {
                   if (a.estado == 'en_progreso') return -1;
                   if (b.estado == 'en_progreso') return 1;
                 }
-                final da =
-                    a.fechaActualizacion ??
+                final da = a.fechaActualizacion ??
                     DateTime.fromMillisecondsSinceEpoch(0);
-                final db =
-                    b.fechaActualizacion ??
+                final db = b.fechaActualizacion ??
                     DateTime.fromMillisecondsSinceEpoch(0);
                 return db.compareTo(da);
               });
@@ -99,6 +106,7 @@ class _HomePageState extends State<HomePage> {
           _misTickets = misTickets;
           _misTareas = misTareas;
           _proyectoTitulos = titulos;
+          _loadedForUserId = userId;
           _loading = false;
         });
       }
@@ -123,6 +131,14 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().user;
+    if (user != null &&
+        user.id != _loadedForUserId &&
+        !_loading &&
+        _error == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && user.id != _loadedForUserId) _load();
+      });
+    }
     final name = user?.firstName.isNotEmpty == true
         ? user!.firstName
         : (user?.username ?? '');

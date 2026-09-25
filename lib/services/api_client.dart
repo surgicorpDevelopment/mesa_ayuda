@@ -394,6 +394,33 @@ class ApiClient {
     return [data];
   }
 
+  /// Recorre `next` de la paginación DRF (PAGE_SIZE=60 en prod).
+  Future<List<Map<String, dynamic>>> _getAllPages(
+    String path, {
+    Map<String, String>? query,
+  }) async {
+    final all = <Map<String, dynamic>>[];
+    var data = await _get(path, query: query);
+    all.addAll(_results(data));
+    var guard = 0;
+    while (data['next'] is String && (data['next'] as String).isNotEmpty) {
+      guard += 1;
+      if (guard > 50) break;
+      final nextUri = Uri.parse(data['next'] as String);
+      final res = await _send(
+        () => http.get(nextUri, headers: _authHeaders()),
+      );
+      if (res.statusCode >= 400) {
+        throw ApiException(res.statusCode, _errorMessage(res));
+      }
+      final decoded = jsonDecode(res.body.trim());
+      if (decoded is! Map<String, dynamic>) break;
+      data = decoded;
+      all.addAll(_results(data));
+    }
+    return all;
+  }
+
   int get _userId => currentUser?.id ?? 3;
   String get _userName => currentUser?.fullName ?? 'Usuario mock';
 
@@ -425,11 +452,11 @@ class ApiClient {
         isDesarrollador: u?.isDesarrollador ?? false,
       );
     }
-    final data = await _get(
+    final rows = await _getAllPages(
       ApiConfig.ticketsPath,
       query: {'format': 'json', ...?filters},
     );
-    return _results(data).map(Ticket.fromJson).toList();
+    return rows.map(Ticket.fromJson).toList();
   }
 
   Future<Ticket> fetchTicket(int id) async {
@@ -899,8 +926,8 @@ class ApiClient {
     }
     final query = <String, String>{'format': 'json'};
     if (proyectoId != null) query['proyecto'] = '$proyectoId';
-    final data = await _get(ApiConfig.tareasPath, query: query);
-    return _results(data).map(Tarea.fromJson).toList();
+    final rows = await _getAllPages(ApiConfig.tareasPath, query: query);
+    return rows.map(Tarea.fromJson).toList();
   }
 
   Future<Tarea> createTarea(Map<String, dynamic> body) async {
