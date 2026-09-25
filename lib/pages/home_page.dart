@@ -116,6 +116,9 @@ class _HomePageState extends State<HomePage> {
       _misTareas.where((t) => t.estado == 'pendiente').length;
   int get _tareasEnProgreso =>
       _misTareas.where((t) => t.estado == 'en_progreso').length;
+  int get _ticketsEnProgreso => _misTickets
+      .where((t) => t.estado == 'en_proceso' || t.estado == 'esperando')
+      .length;
 
   @override
   Widget build(BuildContext context) {
@@ -187,6 +190,12 @@ class _HomePageState extends State<HomePage> {
                     count: _stats?.asignadosAMi ?? 0,
                     color: AppColors.brand600,
                     onTap: () => context.go('/tickets?mine=1'),
+                  ),
+                  _HomeTile(
+                    label: 'Tickets en progreso',
+                    count: _ticketsEnProgreso,
+                    color: AppColors.warning,
+                    onTap: () => context.go('/tickets?bandeja=en_progreso'),
                   ),
                   _HomeTile(
                     label: 'Tareas pendientes',

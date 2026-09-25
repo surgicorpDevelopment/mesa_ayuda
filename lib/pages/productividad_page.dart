@@ -375,7 +375,7 @@ class _TimelineTile extends StatelessWidget {
                       Text(
                         evento.titulo,
                         style: AppTypography.textTheme.titleSmall?.copyWith(
-                          color: canOpen ? AppColors.brand600 : null,
+                          color: AppColors.slate900,
                           fontWeight: FontWeight.w700,
                         ),
                         maxLines: 2,
@@ -440,7 +440,7 @@ class _TimelineTile extends StatelessWidget {
                       Icon(
                         Icons.open_in_new_rounded,
                         size: 14,
-                        color: AppColors.brand600.withValues(alpha: 0.7),
+                        color: AppColors.slate500,
                       ),
                     ],
                   ],

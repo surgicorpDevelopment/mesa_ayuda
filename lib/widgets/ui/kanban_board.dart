@@ -791,18 +791,16 @@ class _EsperandoCardRow extends StatelessWidget {
         if (onToggleCumplido != null)
           Tooltip(
             message: cumplido ? 'Marcar como pendiente' : 'Marcar como cumplido',
-            child: InkWell(
-              onTap: onToggleCumplido,
-              borderRadius: BorderRadius.circular(12),
-              child: Padding(
-                padding: const EdgeInsets.all(2),
-                child: Icon(
-                  cumplido
-                      ? Icons.check_circle
-                      : Icons.radio_button_unchecked,
-                  size: 18,
-                  color: cumplido ? AppColors.success : AppColors.slate300,
-                ),
+            child: SizedBox(
+              width: 28,
+              height: 28,
+              child: Checkbox(
+                value: cumplido,
+                activeColor: AppColors.success,
+                side: const BorderSide(color: AppColors.slate300, width: 1.5),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                visualDensity: VisualDensity.compact,
+                onChanged: (_) => onToggleCumplido!(),
               ),
             ),
           ),
@@ -977,31 +975,34 @@ class _EsperandoFieldState extends State<_EsperandoField> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      IconButton(
-                        tooltip: value[i].cumplido
+                      Tooltip(
+                        message: value[i].cumplido
                             ? 'Marcar como pendiente'
                             : 'Marcar como cumplido',
-                        visualDensity: VisualDensity.compact,
-                        onPressed: () {
-                          final next = [
-                            for (var j = 0; j < value.length; j++)
-                              if (j == i)
-                                value[j].copyWith(cumplido: !value[j].cumplido)
-                              else
-                                value[j],
-                          ];
-                          widget.onChanged(next);
-                        },
-                        icon: Icon(
-                          value[i].cumplido
-                              ? Icons.check_circle
-                              : Icons.radio_button_unchecked,
-                          size: 22,
-                          color: value[i].cumplido
-                              ? AppColors.success
-                              : AppColors.slate300,
+                        child: Checkbox(
+                          value: value[i].cumplido,
+                          activeColor: AppColors.success,
+                          side: const BorderSide(
+                            color: AppColors.slate300,
+                            width: 1.5,
+                          ),
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.compact,
+                          onChanged: (_) {
+                            final next = [
+                              for (var j = 0; j < value.length; j++)
+                                if (j == i)
+                                  value[j]
+                                      .copyWith(cumplido: !value[j].cumplido)
+                                else
+                                  value[j],
+                            ];
+                            widget.onChanged(next);
+                          },
                         ),
                       ),
+                      const SizedBox(width: 4),
                       AppAvatar(name: value[i].nombre, size: 28),
                       const SizedBox(width: 10),
                       Expanded(
@@ -1038,17 +1039,33 @@ class _EsperandoFieldState extends State<_EsperandoField> {
                                     : null,
                               ),
                             ),
-                            if (value[i].cumplido) ...[
-                              const SizedBox(height: 2),
-                              Text(
-                                'Cumplido',
+                            const SizedBox(height: 4),
+                            InkWell(
+                              onTap: () {
+                                final next = [
+                                  for (var j = 0; j < value.length; j++)
+                                    if (j == i)
+                                      value[j].copyWith(
+                                        cumplido: !value[j].cumplido,
+                                      )
+                                    else
+                                      value[j],
+                                ];
+                                widget.onChanged(next);
+                              },
+                              child: Text(
+                                value[i].cumplido
+                                    ? 'Cumplido · tocar para desmarcar'
+                                    : 'Marcar como cumplido',
                                 style: AppTypography.textTheme.labelSmall
                                     ?.copyWith(
-                                  color: AppColors.success,
+                                  color: value[i].cumplido
+                                      ? AppColors.success
+                                      : AppColors.brand600,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
-                            ],
+                            ),
                           ],
                         ),
                       ),

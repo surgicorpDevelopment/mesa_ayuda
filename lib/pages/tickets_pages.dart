@@ -106,8 +106,9 @@ class _TicketsListPageState extends State<TicketsListPage> {
       _bandeja = 'nuevos';
     } else if (widget.onlyAssignedToMe) {
       _bandeja = 'mios';
-    } else if (widget.initialBandeja == 'por_aprobar') {
-      _bandeja = 'por_aprobar';
+    } else if (widget.initialBandeja == 'por_aprobar' ||
+        widget.initialBandeja == 'en_progreso') {
+      _bandeja = widget.initialBandeja;
     }
   }
 
@@ -134,6 +135,12 @@ class _TicketsListPageState extends State<TicketsListPage> {
       case 'en_curso':
         return _items
             .where((t) => t.estado == 'en_proceso' || t.estado == 'esperando')
+            .toList();
+      case 'en_progreso':
+        return _items
+            .where((t) =>
+                t.asignadoAId == user?.id &&
+                (t.estado == 'en_proceso' || t.estado == 'esperando'))
             .toList();
       case 'resuelto':
         return _items.where((t) => t.estado == 'resuelto').toList();
@@ -434,6 +441,8 @@ class _TicketsListPageState extends State<TicketsListPage> {
         return 'Nuevos';
       case 'en_curso':
         return 'En curso';
+      case 'en_progreso':
+        return 'Tickets en progreso';
       case 'mios':
         return 'Mis pendientes';
       case 'esperando':
@@ -1322,13 +1331,6 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
                               children: [
                                 StatusBadge.estado(_ticket!.estado),
                                 PriorityIndicator(prioridad: _ticket!.prioridad),
-                                if (_ticket!.sistemaAfectado.isNotEmpty)
-                                  StatusBadge(
-                                    label: SistemaAfectadoCatalog.labelFor(_ticket!.sistemaAfectado),
-                                    color: AppColors.brand600,
-                                    softColor: AppColors.slate100,
-                                    showDot: false,
-                                  ),
                               ],
                             ),
                             const SizedBox(height: 16),
@@ -1377,8 +1379,23 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                _ticket!.descripcion.isEmpty ? 'Sin descripción' : _ticket!.descripcion,
-                                style: AppTypography.textTheme.bodyLarge,
+                                _ticket!.descripcion.isEmpty
+                                    ? 'Sin descripción'
+                                    : _ticket!.descripcion,
+                                style: AppTypography.textTheme.bodyLarge?.copyWith(
+                                  color: AppColors.slate900,
+                                ),
+                              ),
+                            ],
+                            if (_ticket!.sistemaAfectado.isNotEmpty) ...[
+                              const SizedBox(height: 16),
+                              StatusBadge(
+                                label: SistemaAfectadoCatalog.labelFor(
+                                  _ticket!.sistemaAfectado,
+                                ),
+                                color: AppColors.brand600,
+                                softColor: AppColors.slate100,
+                                showDot: false,
                               ),
                             ],
                             const SizedBox(height: 16),
