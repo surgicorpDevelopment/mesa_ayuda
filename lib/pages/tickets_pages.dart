@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -37,7 +36,6 @@ class _TicketsListPageState extends State<TicketsListPage> {
   /// null = vista agrupada. `por_aprobar` | `nuevos` | `en_progreso` | `esperando` | `mios` | `resuelto` | `rechazado` | `cerrado`
   String? _bandeja;
   String _query = '';
-  int _countMine = 0;
   int _countUnassigned = 0;
   int _countPorAprobar = 0;
   /// `recientes` | `prioridad_alta` | `prioridad_baja`
@@ -158,7 +156,6 @@ class _TicketsListPageState extends State<TicketsListPage> {
     try {
       final auth = context.read<AuthProvider>();
       final inbox = await auth.api.fetchInbox();
-      final countMine = inbox.asignadosAMi;
       final countUnassigned = inbox.colaSinAsignar;
       final countPorAprobar = inbox.porAprobar;
 
@@ -186,7 +183,6 @@ class _TicketsListPageState extends State<TicketsListPage> {
       if (mounted) {
         setState(() {
           _items = items;
-          _countMine = countMine;
           _countUnassigned = countUnassigned;
           _countPorAprobar = countPorAprobar;
           _loading = false;
@@ -1076,20 +1072,27 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                RadioListTile<bool>(
-                  value: true,
+                RadioGroup<bool>(
                   groupValue: propio,
-                  title: const Text('Yo lo autorizo'),
-                  subtitle: const Text('Cambio técnico menor'),
-                  onChanged: (v) => setLocal(() => propio = v ?? true),
-                ),
-                RadioListTile<bool>(
-                  value: false,
-                  groupValue: propio,
-                  title: const Text('Lo autorizó un líder o gestor'),
-                  onChanged: autorizadores.isEmpty
-                      ? null
-                      : (v) => setLocal(() => propio = v ?? false),
+                  onChanged: (v) {
+                    if (v == null) return;
+                    setLocal(() => propio = v);
+                  },
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const RadioListTile<bool>(
+                        value: true,
+                        title: Text('Yo lo autorizo'),
+                        subtitle: Text('Cambio técnico menor'),
+                      ),
+                      RadioListTile<bool>(
+                        value: false,
+                        title: const Text('Lo autorizó un líder o gestor'),
+                        enabled: autorizadores.isNotEmpty,
+                      ),
+                    ],
+                  ),
                 ),
                 if (!propio)
                   DropdownButtonFormField<int>(

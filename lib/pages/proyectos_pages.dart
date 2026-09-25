@@ -41,8 +41,8 @@ class _ProyectosListPageState extends State<ProyectosListPage> {
     }
   }
 
-  static DateTime _epoch = DateTime.fromMillisecondsSinceEpoch(0);
-  static DateTime _far = DateTime(9999);
+  static final DateTime _epoch = DateTime.fromMillisecondsSinceEpoch(0);
+  static final DateTime _far = DateTime(9999);
 
   void _applySort(List<Proyecto> items) {
     int cmpDate(DateTime? a, DateTime? b, {required bool ascending}) {
@@ -433,11 +433,12 @@ class _ProyectoFormPageState extends State<ProyectoFormPage> {
     setState(() => _loadingAreas = true);
     try {
       final list = await context.read<AuthProvider>().api.fetchAreas();
-      if (mounted)
+      if (mounted) {
         setState(() {
           _areas = list;
           _loadingAreas = false;
         });
+      }
     } catch (_) {
       if (mounted) setState(() => _loadingAreas = false);
     }
