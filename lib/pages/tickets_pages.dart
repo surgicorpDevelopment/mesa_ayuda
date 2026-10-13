@@ -9,21 +9,15 @@ import '../providers/auth_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../theme/app_typography.dart';
+import '../utils/bandeja.dart';
 import '../utils/date_format.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/ui/ui.dart';
 
 class TicketsListPage extends StatefulWidget {
-  const TicketsListPage({
-    super.key,
-    this.onlyAssignedToMe = false,
-    this.onlyUnassigned = false,
-    this.initialBandeja,
-  });
+  const TicketsListPage({super.key, this.ruta = const RutaBandeja()});
 
-  final bool onlyAssignedToMe;
-  final bool onlyUnassigned;
-  final String? initialBandeja;
+  final RutaBandeja ruta;
 
   @override
   State<TicketsListPage> createState() => _TicketsListPageState();
@@ -33,11 +27,14 @@ class _TicketsListPageState extends State<TicketsListPage> {
   List<Ticket> _items = [];
   bool _loading = true;
   String? _error;
-  /// null = vista agrupada. `por_aprobar` | `nuevos` | `en_progreso` | `esperando` | `mios` | `resuelto` | `rechazado` | `cerrado`
+  /// Desarrollador: `cola` | `yo` | `persona`.
+  String _alcance = 'yo';
+  /// Cola: `por_aprobar` | `sin_asignar`. Persona: estado del ticket. Null = abiertos.
+  String? _estadoFiltro;
+  int? _personaId;
+  /// Usuario final: null = vista agrupada.
   String? _bandeja;
   String _query = '';
-  int _countUnassigned = 0;
-  int _countPorAprobar = 0;
   /// `recientes` | `prioridad_alta` | `prioridad_baja`
   String _sortBy = 'prioridad_alta';
 
@@ -84,30 +81,26 @@ class _TicketsListPageState extends State<TicketsListPage> {
   @override
   void initState() {
     super.initState();
-    _syncBandejaFromRoute();
+    _aplicarRuta();
     _load();
   }
 
   @override
   void didUpdateWidget(TicketsListPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.onlyAssignedToMe != widget.onlyAssignedToMe ||
-        oldWidget.onlyUnassigned != widget.onlyUnassigned ||
-        oldWidget.initialBandeja != widget.initialBandeja) {
-      _syncBandejaFromRoute();
-      _load();
+    final antes = oldWidget.ruta;
+    final ahora = widget.ruta;
+    if (antes.alcance != ahora.alcance ||
+        antes.estado != ahora.estado ||
+        antes.personaId != ahora.personaId) {
+      setState(_aplicarRuta);
     }
   }
 
-  void _syncBandejaFromRoute() {
-    if (widget.onlyUnassigned) {
-      _bandeja = 'nuevos';
-    } else if (widget.onlyAssignedToMe) {
-      _bandeja = 'mios';
-    } else if (widget.initialBandeja == 'por_aprobar' ||
-        widget.initialBandeja == 'en_progreso') {
-      _bandeja = widget.initialBandeja;
-    }
+  void _aplicarRuta() {
+    _alcance = widget.ruta.alcance;
+    _estadoFiltro = widget.ruta.estado;
+    _personaId = widget.ruta.personaId;
   }
 
   List<Ticket> _of(String bandeja, AppUser? user) {
@@ -123,11 +116,7 @@ class _TicketsListPageState extends State<TicketsListPage> {
           return true;
         }).toList();
       case 'mios':
-        return _items
-            .where((t) =>
-                t.asignadoAId == user?.id &&
-                (t.estado == 'nuevo' || t.estado == 'en_proceso'))
-            .toList();
+        return _items.where((t) => user != null && ticketEnBandejaYo(t, user.id)).toList();
       case 'esperando':
         return _items.where((t) => t.estado == 'esperando').toList();
       case 'en_progreso':
@@ -155,36 +144,22 @@ class _TicketsListPageState extends State<TicketsListPage> {
     });
     try {
       final auth = context.read<AuthProvider>();
-      final inbox = await auth.api.fetchInbox();
-      final countUnassigned = inbox.colaSinAsignar;
-      final countPorAprobar = inbox.porAprobar;
-
       var items = await auth.api.fetchTickets();
-      if (widget.onlyUnassigned) {
-        items = items.where((t) => t.estado == 'nuevo' && t.asignadoAId == null).toList();
-      } else if (widget.onlyAssignedToMe && auth.user != null) {
-        final uid = auth.user!.id;
-        items = items
-            .where((t) =>
-                t.asignadoAId == uid &&
-                (t.estado == 'nuevo' || t.estado == 'en_proceso'))
-            .toList();
-      }
       if (_query.trim().isNotEmpty) {
-        final q = _query.toLowerCase();
+        final q = _query.trim().toLowerCase().replaceFirst(RegExp(r'^#'), '');
         items = items
             .where((t) =>
+                t.id.toString().contains(q) ||
                 t.titulo.toLowerCase().contains(q) ||
                 t.sistemaAfectado.toLowerCase().contains(q) ||
-                (t.asignadoANombre ?? '').toLowerCase().contains(q))
+                (t.asignadoANombre ?? '').toLowerCase().contains(q) ||
+                (t.reportadoPorNombre ?? '').toLowerCase().contains(q))
             .toList();
       }
       _applySort(items);
       if (mounted) {
         setState(() {
           _items = items;
-          _countUnassigned = countUnassigned;
-          _countPorAprobar = countPorAprobar;
           _loading = false;
         });
       }
@@ -198,44 +173,344 @@ class _TicketsListPageState extends State<TicketsListPage> {
     }
   }
 
+  List<Ticket> _devLista(int? yoId, {String? estado}) {
+    return ticketsDeAlcance(
+      _items,
+      alcance: _alcance,
+      yoId: yoId,
+      personaId: _personaId,
+      estado: estado ?? _estadoFiltro,
+    );
+  }
+
+  int _devCount(int? yoId, String? estado) {
+    return ticketsDeAlcance(
+      _items,
+      alcance: _alcance == 'cola' ? 'cola' : _alcance,
+      yoId: yoId,
+      personaId: _personaId,
+      estado: estado,
+    ).length;
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().user;
-    final isDev = user?.isDesarrollador == true;
-    final isLider = user?.isLider == true;
-    final isRegular = !isDev;
-    final listTitle = widget.onlyUnassigned
-        ? 'Cola sin asignar'
-        : widget.onlyAssignedToMe
-            ? 'Mis pendientes'
-            : 'Tickets';
+    if (user?.isDesarrollador == true) {
+      return _buildDev(context, user!);
+    }
+    return _buildRegular(context, user);
+  }
 
+  Widget _buildDev(BuildContext context, AppUser user) {
+    final yoId = user.id;
+    final enCola = _alcance == 'cola';
+    final personas = <CargaPersona>[
+      ...cargasPorPersona(
+        tickets: _items,
+        tareas: const [],
+        excluirId: yoId,
+        soloConAbiertos: false,
+      ),
+    ];
+    if (_personaId != null && !personas.any((p) => p.id == _personaId)) {
+      personas.insert(
+        0,
+        CargaPersona(id: _personaId!, nombre: 'Usuario #$_personaId'),
+      );
+    }
+    final persona = _personaNombre(personas);
+    final titulo = enCola
+        ? 'Cola'
+        : _alcance == 'yo'
+            ? 'Mis tickets'
+            : persona;
+    final visibles = _devLista(yoId);
+    final alcanceCola = ticketsDeAlcance(_items, alcance: 'cola', yoId: yoId).length;
+    final alcanceYo = ticketsDeAlcance(_items, alcance: 'yo', yoId: yoId).length;
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => context.go('/tickets/nuevo'),
+        icon: const Icon(Icons.add),
+        label: const Text('Ticket'),
+      ),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SectionHeader(
+                  title: titulo,
+                  subtitle: enCola && _estadoFiltro == null
+                      ? '${visibles.length} en la cola'
+                      : _estadoFiltro == null
+                          ? '${visibles.length} abiertos'
+                          : '${visibles.length} en este estado',
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    _InboxTile(
+                      label: 'Cola',
+                      count: alcanceCola,
+                      color: AppColors.info,
+                      soft: AppColors.infoSoft,
+                      selected: enCola,
+                      onTap: () => setState(() {
+                        _alcance = 'cola';
+                        _personaId = null;
+                        _estadoFiltro = null;
+                      }),
+                    ),
+                    _InboxTile(
+                      label: 'Yo',
+                      count: alcanceYo,
+                      color: AppColors.brand600,
+                      soft: AppColors.brand50,
+                      selected: _alcance == 'yo',
+                      onTap: () => setState(() {
+                        _alcance = 'yo';
+                        _personaId = null;
+                        _estadoFiltro = null;
+                      }),
+                    ),
+                    if (personas.isNotEmpty)
+                      SizedBox(
+                        width: 240,
+                        child: DropdownButtonFormField<int>(
+                          key: ValueKey('persona-$_personaId-$_alcance'),
+                          initialValue: _alcance == 'persona' ? _personaId : null,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Persona',
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                          ),
+                          items: [
+                            for (final p in personas)
+                              DropdownMenuItem(
+                                value: p.id,
+                                child: Text(
+                                  '${p.nombre} · ${p.ticketsAbiertos}',
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                          ],
+                          onChanged: (id) {
+                            if (id == null) return;
+                            setState(() {
+                              _alcance = 'persona';
+                              _personaId = id;
+                              _estadoFiltro = null;
+                            });
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (final c in _estadoChips(yoId))
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: _InboxTile(
+                            label: c.label,
+                            count: c.count,
+                            color: c.color,
+                            soft: c.soft,
+                            selected: _estadoFiltro == c.id,
+                            onTap: () => setState(() {
+                              _estadoFiltro = _estadoFiltro == c.id ? null : c.id;
+                            }),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                _busquedaYOrden(),
+              ],
+            ),
+          ),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _load,
+              child: _loading
+                  ? const AppSkeletonList()
+                  : _error != null
+                      ? ListView(
+                          children: [
+                            AppEmptyState(message: _error!, icon: Icons.error_outline),
+                          ],
+                        )
+                      : _buildDevInbox(context, yoId),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _personaNombre(List<CargaPersona> personas) {
+    for (final p in personas) {
+      if (p.id == _personaId) return p.nombre;
+    }
+    return _personaId == null ? 'Persona' : 'Usuario #$_personaId';
+  }
+
+  List<_BandejaCard> _estadoChips(int yoId) {
+    if (_alcance == 'cola') {
+      return [
+        _BandejaCard(
+          'por_aprobar',
+          'Por aprobar',
+          _devCount(yoId, 'por_aprobar'),
+          AppColors.warning,
+          AppColors.warningSoft,
+        ),
+        _BandejaCard(
+          'sin_asignar',
+          'Sin asignar',
+          _devCount(yoId, 'sin_asignar'),
+          AppColors.info,
+          AppColors.infoSoft,
+        ),
+      ];
+    }
+    return [
+      _BandejaCard(
+        null,
+        'Abiertos',
+        _devCount(yoId, null),
+        AppColors.brand600,
+        AppColors.brand50,
+      ),
+      _BandejaCard('nuevo', 'Nuevo', _devCount(yoId, 'nuevo'), AppColors.info, AppColors.infoSoft),
+      _BandejaCard(
+        'en_proceso',
+        'En proceso',
+        _devCount(yoId, 'en_proceso'),
+        AppColors.warning,
+        AppColors.warningSoft,
+      ),
+      _BandejaCard(
+        'esperando',
+        'Esperando',
+        _devCount(yoId, 'esperando'),
+        AppColors.purple,
+        AppColors.purpleSoft,
+      ),
+      _BandejaCard(
+        'resuelto',
+        'Resuelto',
+        _devCount(yoId, 'resuelto'),
+        AppColors.success,
+        AppColors.successSoft,
+      ),
+      _BandejaCard(
+        'rechazado',
+        'Rechazado',
+        _devCount(yoId, 'rechazado'),
+        AppColors.danger,
+        AppColors.dangerSoft,
+      ),
+      _BandejaCard(
+        'cerrado',
+        'Cerrado',
+        _devCount(yoId, 'cerrado'),
+        AppColors.slate700,
+        AppColors.slate100,
+      ),
+    ];
+  }
+
+  Widget _buildDevInbox(BuildContext context, int yoId) {
+    final sections = _seccionesDev();
+    final children = <Widget>[];
+    for (final s in sections) {
+      var items = _devLista(yoId, estado: s.estado);
+      _applySort(items);
+      if (items.isEmpty && _estadoFiltro == null && sections.length > 1) continue;
+      children.add(_sectionHeader(s.label, items.length, tint: s.tint));
+      if (items.isEmpty) {
+        children.add(const Padding(
+          padding: EdgeInsets.only(bottom: 12),
+          child: Text('Nada en esta bandeja'),
+        ));
+      }
+      for (final t in items) {
+        children.add(Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: _ticketRow(context, t, false),
+        ));
+      }
+    }
+    if (children.isEmpty) {
+      final vacio = _alcance == 'cola'
+          ? 'No hay tickets en la cola'
+          : 'No hay tickets abiertos en esta bandeja';
+      return ListView(children: [AppEmptyState(message: vacio)]);
+    }
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 88),
+      children: children,
+    );
+  }
+
+  List<({String label, String? estado, Color? tint})> _seccionesDev() {
+    if (_alcance == 'cola') {
+      if (_estadoFiltro == 'por_aprobar') {
+        return [(label: 'Por aprobar', estado: 'por_aprobar', tint: AppColors.warningSoft)];
+      }
+      if (_estadoFiltro == 'sin_asignar') {
+        return [(label: 'Sin asignar', estado: 'sin_asignar', tint: null)];
+      }
+      return [
+        (label: 'Por aprobar', estado: 'por_aprobar', tint: AppColors.warningSoft),
+        (label: 'Sin asignar', estado: 'sin_asignar', tint: null),
+      ];
+    }
+    if (_estadoFiltro != null) {
+      return [(label: _sectionTitle(_estadoFiltro!), estado: _estadoFiltro, tint: null)];
+    }
+    return [
+      (label: 'En proceso', estado: 'en_proceso', tint: null),
+      (label: 'Esperando', estado: 'esperando', tint: null),
+      (label: 'Nuevos', estado: 'nuevo', tint: null),
+    ];
+  }
+
+  Widget _buildRegular(BuildContext context, AppUser? user) {
     final cards = <_BandejaCard>[
-      if (isDev)
-        _BandejaCard('por_aprobar', 'Por aprobar', _countPorAprobar, AppColors.warning, AppColors.warningSoft)
-      else if (isRegular)
-        _BandejaCard('revision', 'En revisión', _of('revision', user).length, AppColors.warning, AppColors.warningSoft),
-      if (isDev && !isLider) ...[
-        _BandejaCard('nuevos', 'Nuevos sin asignar', _countUnassigned, AppColors.info, AppColors.infoSoft),
-        _BandejaCard('mios', 'Mis pendientes', _of('mios', user).length, AppColors.brand600, AppColors.brand50),
-        _BandejaCard(
-          'en_progreso',
-          'Tickets en progreso',
-          _of('en_progreso', user).length,
-          AppColors.warning,
-          AppColors.warningSoft,
-        ),
-        _BandejaCard('esperando', 'Esperando', _of('esperando', user).length, AppColors.purple, AppColors.purpleSoft),
-      ] else ...[
-        _BandejaCard('nuevos', 'Nuevos', _of('nuevos', user).length, AppColors.info, AppColors.infoSoft),
-        _BandejaCard(
-          'en_progreso',
-          'Tickets en progreso',
-          _of('en_progreso', user).length,
-          AppColors.warning,
-          AppColors.warningSoft,
-        ),
-      ],
+      _BandejaCard(
+        'revision',
+        'En revisión',
+        _of('revision', user).length,
+        AppColors.warning,
+        AppColors.warningSoft,
+      ),
+      _BandejaCard('nuevos', 'Nuevos', _of('nuevos', user).length, AppColors.info, AppColors.infoSoft),
+      _BandejaCard(
+        'en_progreso',
+        'Tickets en progreso',
+        _of('en_progreso', user).length,
+        AppColors.warning,
+        AppColors.warningSoft,
+      ),
       _BandejaCard(
         'resuelto',
         'Resuelto',
@@ -264,7 +539,7 @@ class _TicketsListPageState extends State<TicketsListPage> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.go('/tickets/nuevo'),
         icon: const Icon(Icons.add),
-        label: Text(isDev ? 'Ticket' : 'Reportar incidencia'),
+        label: const Text('Reportar incidencia'),
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -275,7 +550,7 @@ class _TicketsListPageState extends State<TicketsListPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SectionHeader(
-                  title: listTitle,
+                  title: 'Tickets',
                   subtitle: _bandeja == null
                       ? '${_items.length} resultados'
                       : '${_of(_bandeja!, user).length} en esta bandeja',
@@ -303,59 +578,7 @@ class _TicketsListPageState extends State<TicketsListPage> {
                   ),
                 ),
                 const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(
-                      child: AppSearchField(
-                        hint: 'Buscar por título, sistema o responsable…',
-                        onChanged: (v) {
-                          _query = v;
-                          _load();
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    SizedBox(
-                      width: 200,
-                      child: DropdownButtonFormField<String>(
-                        initialValue: _sortBy,
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Ordenar',
-                          prefixIcon: Icon(Icons.sort, size: 20),
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
-                          ),
-                        ),
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'prioridad_alta',
-                            child: Text('Prioridad · alta primero'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'prioridad_baja',
-                            child: Text('Prioridad · baja primero'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'recientes',
-                            child: Text('Más recientes'),
-                          ),
-                        ],
-                        onChanged: (v) {
-                          if (v == null) return;
-                          setState(() {
-                            _sortBy = v;
-                            final sorted = List<Ticket>.from(_items);
-                            _applySort(sorted);
-                            _items = sorted;
-                          });
-                        },
-                      ),
-                    ),
-                  ],
-                ),
+                _busquedaYOrden(),
               ],
             ),
           ),
@@ -366,7 +589,7 @@ class _TicketsListPageState extends State<TicketsListPage> {
                   ? const AppSkeletonList()
                   : _error != null
                       ? ListView(children: [AppEmptyState(message: _error!, icon: Icons.error_outline)])
-                      : _buildInbox(context, user, isLider, isRegular),
+                      : _buildInbox(context, user, user?.isLider == true, true),
             ),
           ),
         ],
@@ -381,15 +604,7 @@ class _TicketsListPageState extends State<TicketsListPage> {
     final children = <Widget>[];
     for (final s in sections) {
       var items = _of(s.id, user);
-      if (s.id == 'nuevos') {
-        items.sort((a, b) {
-          final da = a.fechaCreacion ?? DateTime.fromMillisecondsSinceEpoch(0);
-          final db = b.fechaCreacion ?? DateTime.fromMillisecondsSinceEpoch(0);
-          return db.compareTo(da);
-        });
-      } else {
-        _applySort(items);
-      }
+      _applySort(items);
       if (items.isEmpty && _bandeja == null) continue;
       children.add(_sectionHeader(s.label, items.length, tint: s.tint));
       if (items.isEmpty) {
@@ -445,10 +660,14 @@ class _TicketsListPageState extends State<TicketsListPage> {
       case 'revision':
         return 'En revisión';
       case 'nuevos':
+      case 'nuevo':
         return 'Nuevos';
       case 'en_curso':
       case 'en_progreso':
-        return 'Tickets en progreso';
+      case 'en_proceso':
+        return 'En proceso';
+      case 'sin_asignar':
+        return 'Sin asignar';
       case 'mios':
         return 'Mis pendientes';
       case 'esperando':
@@ -485,6 +704,59 @@ class _TicketsListPageState extends State<TicketsListPage> {
     );
   }
 
+  Widget _busquedaYOrden() {
+    return Row(
+      children: [
+        Expanded(
+          child: AppSearchField(
+            hint: 'Buscar por número, título, sistema o responsable…',
+            onChanged: (v) {
+              _query = v;
+              _load();
+            },
+          ),
+        ),
+        const SizedBox(width: 10),
+        SizedBox(
+          width: 200,
+          child: DropdownButtonFormField<String>(
+            initialValue: _sortBy,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: 'Ordenar',
+              prefixIcon: Icon(Icons.sort, size: 20),
+              isDense: true,
+              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            ),
+            items: const [
+              DropdownMenuItem(
+                value: 'prioridad_alta',
+                child: Text('Prioridad · alta primero'),
+              ),
+              DropdownMenuItem(
+                value: 'prioridad_baja',
+                child: Text('Prioridad · baja primero'),
+              ),
+              DropdownMenuItem(
+                value: 'recientes',
+                child: Text('Más recientes'),
+              ),
+            ],
+            onChanged: (v) {
+              if (v == null) return;
+              setState(() {
+                _sortBy = v;
+                final sorted = List<Ticket>.from(_items);
+                _applySort(sorted);
+                _items = sorted;
+              });
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _ticketRow(BuildContext context, Ticket t, bool isRegular) {
     final label = isRegular && t.estado == 'por_aprobar' ? 'En revisión' : labelEstado(t.estado);
     final accent = estadoColor(t.estado);
@@ -506,11 +778,25 @@ class _TicketsListPageState extends State<TicketsListPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            t.titulo,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTypography.textTheme.titleSmall,
+                          Row(
+                            children: [
+                              Text(
+                                '#${t.id}',
+                                style: AppTypography.textTheme.labelMedium?.copyWith(
+                                  color: AppColors.brand600,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  t.titulo,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppTypography.textTheme.titleSmall,
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 4),
                           Text(
@@ -519,6 +805,23 @@ class _TicketsListPageState extends State<TicketsListPage> {
                                 : SistemaAfectadoCatalog.labelFor(t.sistemaAfectado),
                             style: AppTypography.textTheme.bodySmall,
                           ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Reportó ${t.reportadoPorNombre ?? '—'}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.textTheme.bodySmall,
+                          ),
+                          if (!isRegular && ticketSinMovimiento(t)) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              'Sin movimiento',
+                              style: AppTypography.textTheme.labelSmall?.copyWith(
+                                color: AppColors.warning,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -571,7 +874,7 @@ class _TicketsListPageState extends State<TicketsListPage> {
 
 class _BandejaCard {
   const _BandejaCard(this.id, this.label, this.count, this.color, this.soft);
-  final String id;
+  final String? id;
   final String label;
   final int count;
   final Color color;
@@ -1377,7 +1680,7 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Expanded(
-                                    child: Text(
+                                    child: SelectableText(
                                       _ticket!.titulo,
                                       style: AppTypography.textTheme.titleLarge,
                                     ),
@@ -1391,7 +1694,7 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
                                 ],
                               ),
                               const SizedBox(height: 8),
-                              Text(
+                              SelectableText(
                                 _ticket!.descripcion.isEmpty
                                     ? 'Sin descripción'
                                     : _ticket!.descripcion,
@@ -1462,6 +1765,7 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
                         children: [
                           Text('Detalles', style: AppTypography.textTheme.titleMedium),
                           const SizedBox(height: 14),
+                          _DetailRow('ID', '#${_ticket!.id}', selectable: true),
                           _DetailRow('Reportado por', _ticket!.reportadoPorNombre ?? '—'),
                           if (_ticket!.aprobadoPorNombre != null)
                             _DetailRow('Aprobado por', _ticket!.aprobadoPorNombre!),
@@ -1674,12 +1978,14 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
 }
 
 class _DetailRow extends StatelessWidget {
-  const _DetailRow(this.label, this.value);
+  const _DetailRow(this.label, this.value, {this.selectable = false});
   final String label;
   final String value;
+  final bool selectable;
 
   @override
   Widget build(BuildContext context) {
+    final valueStyle = AppTypography.textTheme.titleSmall;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Column(
@@ -1687,7 +1993,10 @@ class _DetailRow extends StatelessWidget {
         children: [
           Text(label, style: AppTypography.textTheme.bodySmall),
           const SizedBox(height: 2),
-          Text(value, style: AppTypography.textTheme.titleSmall),
+          if (selectable)
+            SelectableText(value, style: valueStyle)
+          else
+            Text(value, style: valueStyle),
         ],
       ),
     );

@@ -66,6 +66,7 @@ Grupos: `gp_usuario`, `gp_desarrollador`, `gp_lider_area`, `gp_gestor_proyectos`
 Un usuario regular crea el ticket en `por_aprobar`. Líder del área o gestor lo aprueba (`nuevo`, entra a la cola) o lo rechaza (`rechazado` + comentario). Desarrollador, líder y gestor crean directo en `nuevo`.
 
 Desarrolladores+ ven cola global de abiertos sin asignar (`POST /GP_Ticket/{id}/tomar/`). `por_aprobar` y `rechazado` no entran a esa cola.
+**Visibilidad:** el desarrollador (`gp_desarrollador`) ve proyectos, tareas y tickets de todas las áreas. El líder ve los de su área, más los proyectos que creó o de los que es responsable. El gestor ve todo. El usuario final solo ve los tickets que reportó.
 **Proyectos y tareas:** solo desarrolladores, líderes y gestores.
 **Eliminar ticket o proyecto:** `DELETE /GP_Ticket/{id}/` y `DELETE /GP_Proyecto/{id}/`
 solo líderes/gestores (`gp_lider_area` / `gp_gestor_proyectos`). Borra también

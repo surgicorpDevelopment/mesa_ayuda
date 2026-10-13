@@ -8,6 +8,7 @@ import '../providers/auth_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../theme/app_typography.dart';
+import '../utils/bandeja.dart';
 import '../utils/date_format.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/ui/ui.dart';
@@ -25,6 +26,8 @@ class _ProyectosListPageState extends State<ProyectosListPage> {
   bool _loading = true;
   String? _error;
   String? _estadoFilter;
+  /// `yo` muestra proyectos donde soy responsable o tengo tareas. `equipo` muestra todos.
+  String _alcance = 'equipo';
   /// `inicio_prox` | `inicio_lejos` | `fin_prox` | `recientes` | `prioridad_alta`
   String _sortBy = 'inicio_prox';
 
@@ -111,6 +114,19 @@ class _ProyectosListPageState extends State<ProyectosListPage> {
     }
   }
 
+  List<Proyecto> _visibles(int? userId) {
+    var items = _items;
+    if (_estadoFilter == null) {
+      items = items
+          .where((p) => p.estado != 'completado' && p.estado != 'cancelado')
+          .toList();
+    }
+    if (_alcance != 'yo' || userId == null) return items;
+    return items
+        .where((p) => proyectoEsMio(p, userId, _tareasByProject[p.id] ?? const []))
+        .toList();
+  }
+
   double _progress(int projectId) {
     final list = _tareasByProject[projectId] ?? [];
     if (list.isEmpty) return 0;
@@ -120,8 +136,9 @@ class _ProyectosListPageState extends State<ProyectosListPage> {
 
   @override
   Widget build(BuildContext context) {
-    final canCreate =
-        context.watch<AuthProvider>().user?.canManageProyectos == true;
+    final user = context.watch<AuthProvider>().user;
+    final canCreate = user?.canManageProyectos == true;
+    final visibles = _visibles(user?.id);
     final estados = [
       null,
       'idea',
@@ -150,7 +167,11 @@ class _ProyectosListPageState extends State<ProyectosListPage> {
               children: [
                 SectionHeader(
                   title: 'Proyectos',
-                  subtitle: '${_items.length} proyectos',
+                  subtitle: _alcance == 'yo'
+                      ? '${visibles.length} donde eres responsable o tienes tareas'
+                      : _estadoFilter == null
+                          ? '${visibles.length} abiertos'
+                          : '${visibles.length} proyectos',
                 ),
                 const SizedBox(height: 12),
                 Row(
@@ -160,12 +181,28 @@ class _ProyectosListPageState extends State<ProyectosListPage> {
                         scrollDirection: Axis.horizontal,
                         child: Row(
                           children: [
+                            FilterChip(
+                              label: const Text('Equipo'),
+                              selected: _alcance == 'equipo',
+                              onSelected: (_) => setState(() => _alcance = 'equipo'),
+                              selectedColor: AppColors.brand50,
+                              checkmarkColor: AppColors.brand600,
+                            ),
+                            const SizedBox(width: 8),
+                            FilterChip(
+                              label: const Text('Yo'),
+                              selected: _alcance == 'yo',
+                              onSelected: (_) => setState(() => _alcance = 'yo'),
+                              selectedColor: AppColors.brand50,
+                              checkmarkColor: AppColors.brand600,
+                            ),
+                            const SizedBox(width: 8),
                             for (final e in estados)
                               Padding(
                                 padding: const EdgeInsets.only(right: 8),
                                 child: FilterChip(
                                   label:
-                                      Text(e == null ? 'Todos' : labelEstado(e)),
+                                      Text(e == null ? 'Abiertos' : labelEstado(e)),
                                   selected: _estadoFilter == e,
                                   onSelected: (_) {
                                     setState(() => _estadoFilter = e);
@@ -246,10 +283,18 @@ class _ProyectosListPageState extends State<ProyectosListPage> {
                         ),
                       ],
                     )
-                  : _items.isEmpty
+                  : visibles.isEmpty
                   ? ListView(
-                      children: const [
-                        AppEmptyState(message: 'No hay proyectos'),
+                      children: [
+                        AppEmptyState(
+                          message: _estadoFilter != null
+                              ? (_alcance == 'yo'
+                                  ? 'No tienes proyectos en este estado'
+                                  : 'No hay proyectos')
+                              : (_alcance == 'yo'
+                                  ? 'No tienes proyectos abiertos como responsable ni con tareas asignadas'
+                                  : 'No hay proyectos abiertos'),
+                        ),
                       ],
                     )
                   : GridView.builder(
@@ -257,13 +302,13 @@ class _ProyectosListPageState extends State<ProyectosListPage> {
                       gridDelegate:
                           const SliverGridDelegateWithMaxCrossAxisExtent(
                             maxCrossAxisExtent: 380,
-                            mainAxisExtent: 268,
+                            mainAxisExtent: 332,
                             crossAxisSpacing: 12,
                             mainAxisSpacing: 12,
                           ),
-                      itemCount: _items.length,
+                      itemCount: visibles.length,
                       itemBuilder: (context, i) {
-                        final p = _items[i];
+                        final p = visibles[i];
                         final progress = _progress(p.id);
                         final tareaCount =
                             (_tareasByProject[p.id] ?? []).length;
@@ -368,6 +413,16 @@ class _ProyectosListPageState extends State<ProyectosListPage> {
                                     style: AppTypography.textTheme.bodySmall,
                                   ),
                                 ],
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                resumenAbiertasPorPersona(
+                                  _tareasByProject[p.id] ?? const [],
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTypography.textTheme.labelSmall
+                                    ?.copyWith(color: AppColors.slate700),
                               ),
                               const SizedBox(height: 10),
                               ClipRRect(

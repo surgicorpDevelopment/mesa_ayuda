@@ -9,6 +9,7 @@ import 'pages/proyectos_pages.dart';
 import 'pages/shell_scaffold.dart';
 import 'pages/tareas_page.dart';
 import 'pages/tickets_pages.dart';
+import 'utils/bandeja.dart';
 
 GoRouter createRouter(AuthProvider auth) {
   return GoRouter(
@@ -44,13 +45,8 @@ GoRouter createRouter(AuthProvider auth) {
           GoRoute(
             path: '/tickets',
             builder: (context, state) {
-              final mine = state.uri.queryParameters['mine'] == '1';
-              final unassigned = state.uri.queryParameters['unassigned'] == '1';
-              final bandeja = state.uri.queryParameters['bandeja'];
               return TicketsListPage(
-                onlyAssignedToMe: mine,
-                onlyUnassigned: unassigned,
-                initialBandeja: bandeja,
+                ruta: RutaBandeja.tickets(state.uri.queryParameters),
               );
             },
           ),
@@ -71,13 +67,8 @@ GoRouter createRouter(AuthProvider auth) {
           GoRoute(
             path: '/tareas',
             builder: (_, state) {
-              final estado = state.uri.queryParameters['estado'];
               return MisTareasPage(
-                initialFilter: estado == 'en_progreso' ||
-                        estado == 'pendiente' ||
-                        estado == 'hecho'
-                    ? estado
-                    : null,
+                ruta: RutaBandeja.tareas(state.uri.queryParameters),
               );
             },
           ),

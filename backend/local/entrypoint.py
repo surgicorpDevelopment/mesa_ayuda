@@ -16,6 +16,7 @@ run([sys.executable, 'manage.py', 'migrate', '--noinput'])
 run([sys.executable, 'manage.py', 'setup_gp_groups'])
 run([sys.executable, 'manage.py', 'seed_gp_sistemas'])
 run([sys.executable, 'manage.py', 'seed_local_users'])
+run([sys.executable, 'manage.py', 'seed_local_demo'])
 os.execv(
     sys.executable,
     [sys.executable, 'manage.py', 'runserver', '0.0.0.0:8000'],

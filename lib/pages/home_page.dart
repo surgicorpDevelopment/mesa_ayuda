@@ -8,6 +8,7 @@ import '../providers/auth_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
+import '../utils/bandeja.dart';
 import '../widgets/ui/ui.dart';
 
 class HomePage extends StatefulWidget {
@@ -21,7 +22,10 @@ class _HomePageState extends State<HomePage> {
   InboxStats? _stats;
   List<Ticket> _misTickets = [];
   List<Tarea> _misTareas = [];
+  List<CargaPersona> _equipo = [];
   Map<int, String> _proyectoTitulos = {};
+  int _porAprobar = 0;
+  int _colaSinAsignar = 0;
   String? _error;
   bool _loading = true;
   int? _loadedForUserId;
@@ -47,56 +51,47 @@ class _HomePageState extends State<HomePage> {
       final api = auth.api;
       final userId = user.id;
       final isDev = user.isDesarrollador;
-      final stats = await api.fetchInbox();
+      final stats = isDev ? null : await api.fetchInbox();
       final tickets = await api.fetchTickets();
 
-      // Desarrollador: tickets abiertos asignados a mí.
-      // Usuario final: incidencias que yo reporté y siguen abiertas.
-      final misTickets =
-          tickets.where((t) {
-            final abierto = t.estado != 'resuelto' &&
-                t.estado != 'cerrado' &&
-                t.estado != 'rechazado';
-            if (!abierto) return false;
-            if (isDev) return t.asignadoAId == userId;
-            return t.reportadoPorId == userId;
-          }).toList()
-            ..sort((a, b) {
-              final da = a.fechaActualizacion ??
-                  DateTime.fromMillisecondsSinceEpoch(0);
-              final db = b.fechaActualizacion ??
-                  DateTime.fromMillisecondsSinceEpoch(0);
-              return db.compareTo(da);
-            });
+      final porAprobar = tickets.where(ticketPorAprobar).length;
+      final colaSinAsignar = tickets.where(ticketEnCola).length;
+      final misTickets = tickets.where((t) {
+        if (isDev) return ticketEnBandejaYo(t, userId);
+        final abierto = t.estado != 'resuelto' &&
+            t.estado != 'cerrado' &&
+            t.estado != 'rechazado';
+        return abierto && t.reportadoPorId == userId;
+      }).toList()
+        ..sort((a, b) {
+          final da = a.fechaActualizacion ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final db = b.fechaActualizacion ?? DateTime.fromMillisecondsSinceEpoch(0);
+          return db.compareTo(da);
+        });
 
       var misTareas = <Tarea>[];
+      var equipo = <CargaPersona>[];
       var titulos = <int, String>{};
       if (isDev) {
         final allTareas = await api.fetchTareas();
-        misTareas =
-            allTareas
-                .where(
-                  (t) =>
-                      t.asignadoAId == userId &&
-                      (t.estado == 'pendiente' || t.estado == 'en_progreso'),
-                )
-                .toList()
-              ..sort((a, b) {
-                if (a.estado != b.estado) {
-                  if (a.estado == 'en_progreso') return -1;
-                  if (b.estado == 'en_progreso') return 1;
-                }
-                final da = a.fechaActualizacion ??
-                    DateTime.fromMillisecondsSinceEpoch(0);
-                final db = b.fechaActualizacion ??
-                    DateTime.fromMillisecondsSinceEpoch(0);
-                return db.compareTo(da);
-              });
-        if (misTareas.isNotEmpty) {
-          final proyectos = await api.fetchProyectos();
-          for (final p in proyectos) {
-            titulos[p.id] = p.titulo;
-          }
+        misTareas = allTareas.where((t) => tareaAbiertaDe(t, userId)).toList()
+          ..sort((a, b) {
+            if (a.estado != b.estado) {
+              if (a.estado == 'en_progreso') return -1;
+              if (b.estado == 'en_progreso') return 1;
+            }
+            final da = a.fechaActualizacion ?? DateTime.fromMillisecondsSinceEpoch(0);
+            final db = b.fechaActualizacion ?? DateTime.fromMillisecondsSinceEpoch(0);
+            return db.compareTo(da);
+          });
+        equipo = cargasPorPersona(
+          tickets: tickets,
+          tareas: allTareas,
+          excluirId: userId,
+        );
+        final proyectos = await api.fetchProyectos();
+        for (final p in proyectos) {
+          titulos[p.id] = p.titulo;
         }
       }
 
@@ -105,7 +100,10 @@ class _HomePageState extends State<HomePage> {
           _stats = stats;
           _misTickets = misTickets;
           _misTareas = misTareas;
+          _equipo = equipo;
           _proyectoTitulos = titulos;
+          _porAprobar = porAprobar;
+          _colaSinAsignar = colaSinAsignar;
           _loadedForUserId = userId;
           _loading = false;
         });
@@ -119,14 +117,6 @@ class _HomePageState extends State<HomePage> {
       }
     }
   }
-
-  int get _tareasPendientes =>
-      _misTareas.where((t) => t.estado == 'pendiente').length;
-  int get _tareasEnProgreso =>
-      _misTareas.where((t) => t.estado == 'en_progreso').length;
-  int get _ticketsEnProgreso => _misTickets
-      .where((t) => t.estado == 'en_proceso' || t.estado == 'esperando')
-      .length;
 
   @override
   Widget build(BuildContext context) {
@@ -191,44 +181,36 @@ class _HomePageState extends State<HomePage> {
                 if (user?.isDesarrollador == true) ...[
                   _HomeTile(
                     label: 'Por aprobar',
-                    count: _stats?.porAprobar ?? 0,
+                    count: _porAprobar,
                     color: AppColors.warning,
-                    onTap: () => context.go('/tickets?bandeja=por_aprobar'),
+                    onTap: () => context.go(
+                      const RutaBandeja(alcance: 'cola', estado: 'por_aprobar').ticketsPath,
+                    ),
                   ),
                   _HomeTile(
-                    label: 'Nuevos',
-                    count: _stats?.colaSinAsignar ?? 0,
+                    label: 'Cola sin asignar',
+                    count: _colaSinAsignar,
                     color: AppColors.info,
-                    onTap: () => context.go('/tickets?unassigned=1'),
+                    onTap: () => context.go(
+                      const RutaBandeja(alcance: 'cola', estado: 'sin_asignar').ticketsPath,
+                    ),
                   ),
                   _HomeTile(
-                    label: 'Asignados a mí',
-                    count: _stats?.asignadosAMi ?? 0,
+                    label: 'Mis tickets abiertos',
+                    count: _misTickets.length,
                     color: AppColors.brand600,
-                    onTap: () => context.go('/tickets?mine=1'),
+                    onTap: () => context.go(const RutaBandeja(alcance: 'yo').ticketsPath),
                   ),
                   _HomeTile(
-                    label: 'Tickets en progreso',
-                    count: _ticketsEnProgreso,
-                    color: AppColors.warning,
-                    onTap: () => context.go('/tickets?bandeja=en_progreso'),
-                  ),
-                  _HomeTile(
-                    label: 'Tareas pendientes',
-                    count: _tareasPendientes,
-                    color: AppColors.info,
-                    onTap: () => context.go('/tareas?estado=pendiente'),
-                  ),
-                  _HomeTile(
-                    label: 'Tareas en progreso',
-                    count: _tareasEnProgreso,
-                    color: AppColors.warning,
-                    onTap: () => context.go('/tareas?estado=en_progreso'),
+                    label: 'Mis tareas abiertas',
+                    count: _misTareas.length,
+                    color: AppColors.brand600,
+                    onTap: () => context.go(const RutaBandeja().tareasPath),
                   ),
                 ] else
                   _HomeTile(
                     label: 'Reportados por mí',
-                    count: _stats?.misTicketsAbiertos ?? 0,
+                    count: _stats?.misTicketsAbiertos ?? _misTickets.length,
                     color: AppColors.brand600,
                     onTap: () => context.go('/tickets'),
                   ),
@@ -257,15 +239,91 @@ class _HomePageState extends State<HomePage> {
             ),
             if (user?.isDesarrollador == true) ...[
               const SizedBox(height: 28),
+              const SectionHeader(
+                title: 'Equipo',
+                subtitle: 'Trabajo abierto de los demás',
+              ),
+              const SizedBox(height: 12),
+              if (_equipo.isEmpty)
+                const AppEmptyState(
+                  message: 'Nadie del equipo tiene trabajo abierto',
+                  icon: Icons.groups_outlined,
+                )
+              else
+                ..._equipo.asMap().entries.map((e) {
+                  final p = e.value;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: AppCard(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      child: Row(
+                        children: [
+                          AppAvatar(name: p.nombre, size: 32),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  p.nombre,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppTypography.textTheme.titleSmall,
+                                ),
+                                const SizedBox(height: 4),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 4,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    _EquipoLink(
+                                      label: '${p.ticketsAbiertos} tickets',
+                                      onTap: () => context.go(
+                                        RutaBandeja(alcance: 'persona', personaId: p.id).ticketsPath,
+                                      ),
+                                    ),
+                                    _EquipoLink(
+                                      label: '${p.tareasAbiertas} tareas',
+                                      onTap: () => context.go(
+                                        RutaBandeja(alcance: 'persona', personaId: p.id).tareasPath,
+                                      ),
+                                    ),
+                                    if (p.sinMovimiento > 0)
+                                      Text(
+                                        'Sin movimiento · ${p.sinMovimiento}',
+                                        style: AppTypography.textTheme.labelSmall?.copyWith(
+                                          color: AppColors.warning,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    if (p.enEspera > 0)
+                                      Text(
+                                        'En espera · ${p.enEspera}',
+                                        style: AppTypography.textTheme.labelSmall?.copyWith(
+                                          color: AppColors.purple,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ).animate().fadeIn(delay: (40 * e.key).ms);
+                }),
+              const SizedBox(height: 28),
               SectionHeader(
                 title: 'Mis tareas',
                 subtitle: _misTareas.isEmpty
                     ? 'Avance de proyectos · nada asignado'
                     : 'Avance de proyectos · ${_misTareas.length} por avanzar',
                 action: AppButton(
-                  label: 'Proyectos',
+                  label: 'Ver todas',
                   variant: AppButtonVariant.ghost,
-                  onPressed: () => context.go('/proyectos'),
+                  onPressed: () => context.go(const RutaBandeja().tareasPath),
                 ),
               ),
               const SizedBox(height: 12),
@@ -306,6 +364,28 @@ class _HomePageState extends State<HomePage> {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
+                                if (etiquetaEspera(t) != null) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    etiquetaEspera(t)!,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: AppTypography.textTheme.labelSmall?.copyWith(
+                                      color: AppColors.purple,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                                if (tareaSinMovimiento(t)) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Sin movimiento',
+                                    style: AppTypography.textTheme.labelSmall?.copyWith(
+                                      color: AppColors.warning,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                           ),
@@ -334,7 +414,7 @@ class _HomePageState extends State<HomePage> {
                 variant: AppButtonVariant.ghost,
                 onPressed: () => context.go(
                   user?.isDesarrollador == true
-                      ? '/tickets?mine=1'
+                      ? const RutaBandeja(alcance: 'yo').ticketsPath
                       : '/tickets',
                 ),
               ),
@@ -384,6 +464,23 @@ class _HomePageState extends State<HomePage> {
                                     ? 'Sin sistema'
                                     : parts.join(' · ');
                               }(), style: AppTypography.textTheme.bodySmall),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Reportó ${t.reportadoPorNombre ?? '—'}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTypography.textTheme.bodySmall,
+                              ),
+                              if (user?.isDesarrollador == true && ticketSinMovimiento(t)) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Sin movimiento',
+                                  style: AppTypography.textTheme.labelSmall?.copyWith(
+                                    color: AppColors.warning,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),
@@ -450,6 +547,31 @@ class _HomeTile extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EquipoLink extends StatelessWidget {
+  const _EquipoLink({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+        child: Text(
+          label,
+          style: AppTypography.textTheme.labelMedium?.copyWith(
+            color: AppColors.brand600,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ),
