@@ -1093,6 +1093,7 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
 
   Future<void> _createTarea(
     String titulo,
+    String descripcion,
     String estado,
     int? asignadoAId,
     List<TareaEspera> esperando,
@@ -1100,6 +1101,7 @@ class _ProyectoDetailPageState extends State<ProyectoDetailPage>
     try {
       final tarea = await context.read<AuthProvider>().api.createTarea({
         'titulo': titulo,
+        'descripcion': descripcion,
         'estado': estado,
         'proyecto': widget.id,
         if (asignadoAId != null) 'asignado_a': asignadoAId,

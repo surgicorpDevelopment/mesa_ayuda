@@ -38,6 +38,7 @@ class KanbanBoard extends StatefulWidget {
   final void Function(Tarea tarea, String nuevoEstado) onMove;
   final void Function(
     String titulo,
+    String descripcion,
     String estado,
     int? asignadoAId,
     List<TareaEspera> esperando,
@@ -372,6 +373,7 @@ class _KanbanBoardState extends State<KanbanBoard> {
 
   Future<void> _showCreateDialog(String estado) async {
     final titleCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
     int? selectedUserId;
     var esperando = <TareaEspera>[];
     final usuarios = _usuariosForDropdown(null, null);
@@ -391,6 +393,13 @@ class _KanbanBoardState extends State<KanbanBoard> {
                   AppTextField(
                     controller: titleCtrl,
                     label: 'Título de la tarea',
+                  ),
+                  const SizedBox(height: 14),
+                  AppTextField(
+                    controller: descCtrl,
+                    label: 'Descripción',
+                    minLines: 2,
+                    maxLines: 5,
                   ),
                   if (usuarios.isNotEmpty) ...[
                     const SizedBox(height: 14),
@@ -438,8 +447,15 @@ class _KanbanBoardState extends State<KanbanBoard> {
               onPressed: () {
                 final titulo = titleCtrl.text.trim();
                 if (titulo.isEmpty) return;
+                final descripcion = descCtrl.text.trim();
                 Navigator.of(ctx).pop();
-                widget.onCreate(titulo, estado, selectedUserId, esperando);
+                widget.onCreate(
+                  titulo,
+                  descripcion,
+                  estado,
+                  selectedUserId,
+                  esperando,
+                );
               },
               child: const Text('Crear'),
             ),
@@ -449,6 +465,7 @@ class _KanbanBoardState extends State<KanbanBoard> {
     );
 
     titleCtrl.dispose();
+    descCtrl.dispose();
   }
 }
 
